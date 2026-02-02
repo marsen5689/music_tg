@@ -343,12 +343,10 @@ export const fetchAudioFiles = async (
         const me = await tg.getMe();
         console.log('fetchAudioFiles: Current user ID:', me.id.toString());
 
-        // Get target peer (Saved Messages or specific chat)
-        const targetId = chatId || me.id.toString();
+        // Get target peer
         let targetPeer: Parameters<typeof tg.getMessages>[0];
 
         if (chatId) {
-            // Try to resolve the chat ID by iterating dialogs
             let targetDialog = null;
             for await (const dialog of tg.iterDialogs()) {
                 if (dialog.peer.id.toString() === chatId) {
@@ -362,54 +360,53 @@ export const fetchAudioFiles = async (
                 throw new Error('Chat not found');
             }
         } else {
-            // Use "me" for Saved Messages
             targetPeer = 'me';
         }
 
         console.log('fetchAudioFiles: Fetching messages...');
 
-        // Fetch messages - mtcute uses async iterators
         let messageCount = 0;
         const MAX_MESSAGES_SCAN = 500;
 
         for await (const message of tg.iterHistory(targetPeer, { limit: MAX_MESSAGES_SCAN })) {
             messageCount++;
 
-            if (message.media?.type === 'document') {
+            if (message.media) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const doc = message.media as any;
-                const mimeType = doc.mimeType;
+                const media = message.media as any;
 
-                // Check if it's an audio file
-                if (mimeType?.startsWith('audio/')) {
-                    let title = 'Unknown Track';
-                    let artist = 'Unknown Artist';
-                    let duration = 0;
+                if (media.type === 'audio' || media.type === 'document') {
+                    const mimeType = media.mimeType;
 
-                    // Extract audio metadata
-                    if (doc.type === 'audio' || doc.attributes) {
-                        title = doc.title || doc.fileName || title;
-                        artist = doc.performer || artist;
-                        duration = doc.duration || 0;
-                    } else if (doc.fileName) {
-                        title = doc.fileName.replace(/\.(mp3|ogg|m4a|flac)$/i, '');
-                    }
+                    if (media.type === 'audio' || (mimeType && mimeType.startsWith('audio/'))) {
+                        let title = 'Unknown Track';
+                        let artist = 'Unknown Artist';
+                        let duration = 0;
 
-                    const track: Track = {
-                        id: `${message.id}`,
-                        title,
-                        artist,
-                        duration,
-                        fileSize: doc.fileSize || 0,
-                        messageId: message.id,
-                        mimeType: mimeType || 'audio/mpeg',
-                        chatId: targetId,
-                    };
+                        title = media.title || media.fileName || title;
+                        artist = media.performer || artist;
+                        duration = media.duration || 0;
 
-                    tracks.push(track);
+                        if (media.fileName && title === 'Unknown Track') {
+                            title = media.fileName.replace(/\.(mp3|ogg|m4a|flac)$/i, '');
+                        }
 
-                    if (onTrackFound) {
-                        onTrackFound(track);
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const track: any = {
+                            id: `${message.id}`,
+                            title,
+                            artist,
+                            duration,
+                            url: '',
+                            albums: [],
+                        };
+
+                        console.log(`Found track: ${title} - ${artist}`);
+                        tracks.push(track);
+
+                        if (onTrackFound) {
+                            onTrackFound(track);
+                        }
                     }
                 }
             }
