@@ -33,31 +33,41 @@ export const connectWithQR = async (
 
     await client.connect();
 
-    let passwordCache: string | null = null;
+    const telegramClient = client;
 
-    const user = await client.signInUserWithQrCode(
-        { apiId: API_ID, apiHash: API_HASH },
-        {
-            qrCode: async (code) => {
-                onQRCode(code);
-            },
-            password: async (hint) => {
-                if (!passwordCache && onPasswordRequired) {
-                    passwordCache = await onPasswordRequired(hint);
-                    console.log('Password cached, type:', typeof passwordCache, 'length:', passwordCache?.length);
-                }
-                return Buffer.from(passwordCache || '', 'utf-8') as any;
-            },
-            onError: async (err) => {
-                console.error('QR Auth error:', err);
-                throw err;
-            },
-        }
-    );
+    try {
+        const user = await telegramClient.signInUserWithQrCode(
+            { apiId: API_ID, apiHash: API_HASH },
+            {
+                qrCode: async (code) => {
+                    onQRCode(code);
+                },
+                password: async (hint) => {
+                    if (onPasswordRequired) {
+                        const password = await onPasswordRequired(hint);
+                        console.log('Password received, length:', password.length);
+                        
+                        // Используем встроенный метод checkPassword
+                        await (telegramClient as any).checkPassword(password);
+                        
+                        return password;
+                    }
+                    return '';
+                },
+                onError: async (err) => {
+                    console.error('QR Auth error:', err);
+                    throw err;
+                },
+            }
+        );
 
-    console.log('Logged in as:', user);
-    const stringSession = client.session as StringSession;
-    return String(stringSession.save());
+        console.log('Logged in as:', user);
+        const stringSession = telegramClient.session as StringSession;
+        return String(stringSession.save());
+    } catch (error) {
+        console.error('connectWithQR error:', error);
+        throw error;
+    }
 };
 
 export const connectWithPhone = async (
@@ -71,7 +81,9 @@ export const connectWithPhone = async (
 
     await client.connect();
 
-    await client.sendCode(
+    const telegramClient = client;
+
+    await telegramClient.sendCode(
         {
             apiId: API_ID,
             apiHash: API_HASH,
@@ -81,69 +93,39 @@ export const connectWithPhone = async (
 
     const code = await onCodeRequired();
 
-    let passwordCache: string | null = null;
-
-    await client.signInUser(
-        {
-            apiId: API_ID,
-            apiHash: API_HASH,
-        },
-        {
-            phoneNumber,
-            phoneCode: async () => code,
-            password: async (hint) => {
-                if (!passwordCache && onPasswordRequired) {
-                    passwordCache = await onPasswordRequired(hint);
-                    console.log('Password cached, type:', typeof passwordCache, 'length:', passwordCache?.length);
-                }
-                return Buffer.from(passwordCache || '', 'utf-8') as any;
-            },
-            onError: async (err) => {
-                console.error('Phone Auth error:', err);
-                throw err;
-            },
-        }
-    );
-
-    const stringSession = client.session as StringSession;
-    return String(stringSession.save());
-};
-
-export const getAudioSources = async (): Promise<AudioSource[]> => {
-    if (!client) {
-        throw new Error('Client not initialized');
-    }
-
     try {
-        const dialogs = await client.getDialogs({ limit: 100 });
-        const me = await client.getMe();
-        const meId = me.id.toString();
+        await telegramClient.signInUser(
+            {
+                apiId: API_ID,
+                apiHash: API_HASH,
+            },
+            {
+                phoneNumber,
+                phoneCode: async () => code,
+                password: async (hint) => {
+                    if (onPasswordRequired) {
+                        const password = await onPasswordRequired(hint);
+                        console.log('Password received, length:', password.length);
+                        
+                        // Используем встроенный метод checkPassword
+                        await (telegramClient as any).checkPassword(password);
+                        
+                        return password;
+                    }
+                    return '';
+                },
+                onError: async (err) => {
+                    console.error('Phone Auth error:', err);
+                    throw err;
+                },
+            }
+        );
 
-        return dialogs
-            .filter((d) => d.entity && 'id' in d.entity)
-            .map((d) => {
-                const entity = d.entity as any;
-                const id = entity.id.toString();
-                let title = d.title || 'Untitled';
-
-                // Rename self-chat to "Saved Messages"
-                if (id === meId) {
-                    title = 'Saved Messages';
-                }
-
-                let type: AudioSource['type'] = 'chat';
-                if (d.isUser) type = 'user';
-                if (d.isChannel) type = 'channel';
-
-                return {
-                    id,
-                    title,
-                    type,
-                };
-            });
+        const stringSession = telegramClient.session as StringSession;
+        return String(stringSession.save());
     } catch (error) {
-        console.error('getAudioSources: Error', error);
-        return [];
+        console.error('connectWithPhone error:', error);
+        throw error;
     }
 };
 
