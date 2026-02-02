@@ -25,10 +25,7 @@ jobs:
         run: npm ci
 
       - name: Build
-        env:
-          VITE_API_ID: ${{ secrets.VITE_API_ID }}
-          VITE_API_HASH: ${{ secrets.VITE_API_HASH }}
-        run: npm run build
+        run: VITE_API_ID=${{ secrets.VITE_API_ID }} VITE_API_HASH=${{ secrets.VITE_API_HASH }} npm run build
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
