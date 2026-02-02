@@ -45,9 +45,8 @@ export const connectWithQR = async (
                 password: async (hint) => {
                     if (onPasswordRequired) {
                         const pwd = await onPasswordRequired(hint);
-                        console.log('Password received:', typeof pwd, 'length:', pwd?.length);
-                        // Просто возвращаем строку как есть
-                        return String(pwd);
+                        // Важно: возвращаем только строку и убеждаемся, что она не пустая
+                        return String(pwd || '');
                     }
                     return '';
                 },
