@@ -60,13 +60,11 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
         try {
             console.log('Starting to load tracks...');
             const client = getTelegramClient();
-            console.log('Got Telegram client, connected:', client.connected);
+            console.log('Got Telegram client');
 
-            if (!client.connected) {
-                console.log('Client not connected, connecting...');
-                await client.connect();
-                console.log('Client connected successfully');
-            }
+            // mtcute handles connection automatically in API calls
+            await client.connect();
+            console.log('Client ready');
 
             console.log('Fetching audio files...');
             const audioFiles = await fetchAudioFiles(currentSourceId, (track) => {

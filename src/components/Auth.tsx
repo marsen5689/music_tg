@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
     initTelegramClient,
-    connectWithQR,
-    connectWithPhone,
-    saveSession,
+    startPhoneAuth,
+    submitCode,
+    submit2FA,
+    startQRAuth,
+    stopQRAuth,
+    type AuthState,
 } from '../utils/telegram';
 import './Auth.css';
 
 interface AuthProps {
-    onAuthenticated: (session: string) => void;
+    onAuthenticated: () => void;
 }
 
 type AuthMode = 'qr' | 'phone';
@@ -55,12 +58,33 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
     const [qrCode, setQrCode] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [awaitingCode, setAwaitingCode] = useState(false);
-    const [awaitingPassword, setAwaitingPassword] = useState(false);
 
-    // Refs for password and code resolvers
-    const passwordResolverRef = React.useRef<((value: string) => void) | null>(null);
-    const codeResolverRef = React.useRef<((value: string) => void) | null>(null);
+    // Auth state from the new flow
+    const [authState, setAuthState] = useState<AuthState>({ step: 'idle' });
+
+    // Auth callbacks
+    const handleStateChange = useCallback((state: AuthState) => {
+        console.log('[Auth] State changed:', state.step);
+        setAuthState(state);
+        setIsLoading(false);
+
+        switch (state.step) {
+            case 'done':
+                // Mark as initialized for session check
+                localStorage.setItem('mtcute_initialized', 'true');
+                onAuthenticated();
+                break;
+            case 'error':
+                setError(state.message);
+                break;
+            case '2fa':
+                setPasswordHint(state.hint || null);
+                break;
+            case 'qr':
+                setQrCode(state.url);
+                break;
+        }
+    }, [onAuthenticated]);
 
     const handleQRAuth = async () => {
         setIsLoading(true);
@@ -69,41 +93,10 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
 
         try {
             initTelegramClient();
-
-            const session = await connectWithQR(
-                (qr) => {
-                    // Convert token to login URL (base64url format)
-                    const token = qr.token
-                        .toString('base64')
-                        .replace(/\+/g, '-')
-                        .replace(/\//g, '_')
-                        .replace(/=/g, '');
-                    const url = `tg://login?token=${token}`;
-                    setQrCode(url);
-                },
-                async (hint) => {
-                    // 2FA password required
-                    setAwaitingPassword(true);
-                    if (hint) setPasswordHint(hint);
-                    setIsLoading(false);
-
-                    return new Promise<string>((resolve) => {
-                        passwordResolverRef.current = resolve;
-                    });
-                }
-            );
-
-            saveSession(session);
-            onAuthenticated(session);
+            await startQRAuth({ onStateChange: handleStateChange });
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Authentication failed');
             console.error('QR Auth error:', err);
-            // Reset states to allow retry
-            setPassword('');
-            setAwaitingPassword(false);
-            setQrCode(null);
-            passwordResolverRef.current = null;
-        } finally {
             setIsLoading(false);
         }
     };
@@ -120,68 +113,188 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
 
         try {
             initTelegramClient();
-
-            const session = await connectWithPhone(
-                phoneNumber,
-                async () => {
-                    setAwaitingCode(true);
-                    setIsLoading(false);
-
-                    return new Promise<string>((resolve) => {
-                        codeResolverRef.current = resolve;
-                    });
-                },
-                async (hint) => {
-                    // 2FA password required
-                    setAwaitingPassword(true);
-                    if (hint) setPasswordHint(hint);
-                    setIsLoading(false);
-
-                    return new Promise<string>((resolve) => {
-                        passwordResolverRef.current = resolve;
-                    });
-                }
-            );
-
-            saveSession(session);
-            onAuthenticated(session);
+            await startPhoneAuth(phoneNumber, { onStateChange: handleStateChange });
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Authentication failed');
             console.error('Phone Auth error:', err);
-            // Reset states to allow retry
-            setPassword('');
-            setCode('');
-            setAwaitingPassword(false);
-            setAwaitingCode(false);
-            passwordResolverRef.current = null;
-            codeResolverRef.current = null;
-        } finally {
             setIsLoading(false);
-            setAwaitingCode(false);
-            setAwaitingPassword(false);
         }
     };
 
-    const handleCodeSubmit = () => {
-        if (code.length >= 5 && codeResolverRef.current) {
-            setIsLoading(true);
-            codeResolverRef.current(code);
-            codeResolverRef.current = null;
+    const handleCodeSubmit = async () => {
+        if (code.length < 5 || authState.step !== 'code') {
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            await submitCode(
+                authState.phone,
+                code,
+                authState.phoneCodeHash,
+                { onStateChange: handleStateChange }
+            );
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Verification failed');
+            setIsLoading(false);
         }
     };
 
-    const handlePasswordSubmit = () => {
-        console.log('[Auth] handlePasswordSubmit called, password length:', password.length, 'has resolver:', !!passwordResolverRef.current);
-        if (password.length > 0 && passwordResolverRef.current) {
-            setIsLoading(true);
-            console.log('[Auth] Resolving password promise with value of length:', password.length);
-            passwordResolverRef.current(password);
-            passwordResolverRef.current = null;
+    const handlePasswordSubmit = async () => {
+        if (!password) {
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            await submit2FA(password, { onStateChange: handleStateChange });
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Password verification failed');
+            setIsLoading(false);
+        }
+    };
+
+    const handleModeChange = (newMode: AuthMode) => {
+        // Stop QR polling when switching modes
+        stopQRAuth();
+        setMode(newMode);
+        setAuthState({ step: 'idle' });
+        setError(null);
+        setQrCode(null);
+        setCode('');
+        setPassword('');
+    };
+
+    const handleRetry = () => {
+        stopQRAuth();
+        setError(null);
+        setPassword('');
+        setCode('');
+        setAuthState({ step: 'idle' });
+        setQrCode(null);
+    };
+
+    // Determine what to render based on auth state
+    const renderAuthContent = () => {
+        // 2FA screen (same for both modes)
+        if (authState.step === '2fa') {
+            return (
+                <>
+                    <div className="form-group">
+                        <label className="form-label">Two-Factor Authentication</label>
+                        <p className="form-hint">
+                            {passwordHint
+                                ? <>Hint: <strong>{passwordHint}</strong></>
+                                : 'Your account has 2FA enabled. Please enter your cloud password.'}
+                        </p>
+                        <input
+                            type="password"
+                            className="form-input"
+                            placeholder="Enter your 2FA password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            disabled={isLoading}
+                            autoFocus
+                            onKeyDown={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+                        />
+                    </div>
+                    <button
+                        className="auth-button"
+                        onClick={handlePasswordSubmit}
+                        disabled={isLoading || !password}
+                    >
+                        {isLoading ? 'Verifying...' : 'Submit'}
+                    </button>
+                </>
+            );
+        }
+
+        if (mode === 'qr') {
+            // QR Code mode
+            if (qrCode) {
+                return (
+                    <div className="qr-container">
+                        <div className="qr-code">
+                            <QRCodeSVG value={qrCode} size={200} />
+                        </div>
+                        <div className="qr-instructions">
+                            <strong>Scan with Telegram</strong>
+                            Open Telegram on your phone, go to Settings → Devices → Link
+                            Desktop Device, and scan this QR code
+                        </div>
+                    </div>
+                );
+            }
+
+            return isLoading ? (
+                <div className="loading-container">
+                    <div className="spinner"></div>
+                    <div className="loading-text">Connecting...</div>
+                </div>
+            ) : (
+                <button className="auth-button" onClick={handleQRAuth}>
+                    Generate QR Code
+                </button>
+            );
         } else {
-            console.warn('[Auth] Cannot submit password - missing password or resolver');
+            // Phone mode
+            if (authState.step === 'code') {
+                return (
+                    <>
+                        <div className="form-group">
+                            <label className="form-label">Verification Code</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="12345"
+                                value={code}
+                                onChange={(e) => setCode(e.target.value)}
+                                disabled={isLoading}
+                                maxLength={6}
+                                autoFocus
+                                onKeyDown={(e) => e.key === 'Enter' && handleCodeSubmit()}
+                            />
+                        </div>
+                        <button
+                            className="auth-button"
+                            onClick={handleCodeSubmit}
+                            disabled={isLoading || code.length < 5}
+                        >
+                            {isLoading ? 'Verifying...' : 'Verify'}
+                        </button>
+                    </>
+                );
+            }
+
+            return (
+                <>
+                    <div className="form-group">
+                        <label className="form-label">Phone Number</label>
+                        <input
+                            type="tel"
+                            className="form-input"
+                            placeholder="+1234567890"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value)}
+                            disabled={isLoading}
+                            onKeyDown={(e) => e.key === 'Enter' && handlePhoneAuth()}
+                        />
+                    </div>
+                    <button
+                        className="auth-button"
+                        onClick={handlePhoneAuth}
+                        disabled={isLoading || !phoneNumber}
+                    >
+                        {isLoading ? 'Sending code...' : 'Send Code'}
+                    </button>
+                </>
+            );
         }
     };
-
 
     return (
         <div className="auth-container fade-in">
@@ -197,13 +310,13 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
                 <div className="auth-tabs">
                     <button
                         className={`auth-tab ${mode === 'qr' ? 'active' : ''}`}
-                        onClick={() => setMode('qr')}
+                        onClick={() => handleModeChange('qr')}
                     >
                         QR Code
                     </button>
                     <button
                         className={`auth-tab ${mode === 'phone' ? 'active' : ''}`}
-                        onClick={() => setMode('phone')}
+                        onClick={() => handleModeChange('phone')}
                     >
                         Phone Number
                     </button>
@@ -214,151 +327,16 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
                         {error}
                         <button
                             className="error-retry-button"
-                            onClick={() => {
-                                setError(null);
-                                setPassword('');
-                                setCode('');
-                                setAwaitingPassword(false);
-                                setAwaitingCode(false);
-                                setQrCode(null);
-                            }}
+                            onClick={handleRetry}
                         >
                             Try Again
                         </button>
                     </div>
                 )}
 
-                {mode === 'qr' ? (
-                    <div className="auth-form">
-                        {awaitingPassword ? (
-                            <>
-                                <div className="form-group">
-                                    <label className="form-label">Two-Factor Authentication</label>
-                                    <p className="form-hint">
-                                        {passwordHint
-                                            ? <>Hint: <strong>{passwordHint}</strong></>
-                                            : 'Your account has 2FA enabled. Please enter your cloud password.'}
-                                    </p>
-                                    <input
-                                        type="password"
-                                        className="form-input"
-                                        placeholder="Enter your 2FA password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        disabled={isLoading}
-                                        autoFocus
-                                    />
-                                </div>
-                                <button
-                                    className="auth-button"
-                                    onClick={handlePasswordSubmit}
-                                    disabled={isLoading || !password}
-                                >
-                                    {isLoading ? 'Verifying...' : 'Submit'}
-                                </button>
-                            </>
-                        ) : qrCode ? (
-                            <div className="qr-container">
-                                <div className="qr-code">
-                                    <QRCodeSVG value={qrCode} size={200} />
-                                </div>
-                                <div className="qr-instructions">
-                                    <strong>Scan with Telegram</strong>
-                                    Open Telegram on your phone, go to Settings → Devices → Link
-                                    Desktop Device, and scan this QR code
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                {isLoading ? (
-                                    <div className="loading-container">
-                                        <div className="spinner"></div>
-                                        <div className="loading-text">Connecting...</div>
-                                    </div>
-                                ) : (
-                                    <button className="auth-button" onClick={handleQRAuth}>
-                                        Generate QR Code
-                                    </button>
-                                )}
-                            </>
-                        )}
-                    </div>
-                ) : (
-                    <div className="auth-form">
-                        {awaitingPassword ? (
-                            <>
-                                <div className="form-group">
-                                    <label className="form-label">Two-Factor Authentication</label>
-                                    <p className="form-hint">
-                                        {passwordHint
-                                            ? <>Hint: <strong>{passwordHint}</strong></>
-                                            : 'Your account has 2FA enabled. Please enter your cloud password.'}
-                                    </p>
-                                    <input
-                                        type="password"
-                                        className="form-input"
-                                        placeholder="Enter your 2FA password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        disabled={isLoading}
-                                        autoFocus
-                                    />
-                                </div>
-                                <button
-                                    className="auth-button"
-                                    onClick={handlePasswordSubmit}
-                                    disabled={isLoading || !password}
-                                >
-                                    {isLoading ? 'Verifying...' : 'Submit'}
-                                </button>
-                            </>
-                        ) : !awaitingCode ? (
-                            <>
-                                <div className="form-group">
-                                    <label className="form-label">Phone Number</label>
-                                    <input
-                                        type="tel"
-                                        className="form-input"
-                                        placeholder="+1234567890"
-                                        value={phoneNumber}
-                                        onChange={(e) => setPhoneNumber(e.target.value)}
-                                        disabled={isLoading}
-                                    />
-                                </div>
-                                <button
-                                    className="auth-button"
-                                    onClick={handlePhoneAuth}
-                                    disabled={isLoading || !phoneNumber}
-                                >
-                                    {isLoading ? 'Sending code...' : 'Send Code'}
-                                </button>
-                            </>
-                        ) : (
-                            <>
-                                <div className="form-group">
-                                    <label className="form-label">Verification Code</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="12345"
-                                        value={code}
-                                        onChange={(e) => setCode(e.target.value)}
-                                        disabled={isLoading}
-                                        maxLength={5}
-                                        autoFocus
-                                    />
-                                </div>
-                                <button
-                                    className="auth-button"
-                                    onClick={handleCodeSubmit}
-                                    disabled={isLoading || code.length < 5}
-                                >
-                                    {isLoading ? 'Verifying...' : 'Verify'}
-                                </button>
-                            </>
-                        )}
-                    </div>
-                )}
+                <div className="auth-form">
+                    {renderAuthContent()}
+                </div>
             </div>
         </div>
     );
