@@ -115,7 +115,14 @@ export async function submitCode(
         callbacks.onStateChange({ step: 'done' });
     } catch (error: unknown) {
         // Check if 2FA is required
-        if (error instanceof Error && error.message.includes('SESSION_PASSWORD_NEEDED')) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const err = error as any;
+        if (
+            (error instanceof Error && error.message.includes('SESSION_PASSWORD_NEEDED')) ||
+            err?.text === 'SESSION_PASSWORD_NEEDED' ||
+            err?.message === 'SESSION_PASSWORD_NEEDED'
+        ) {
+            console.log('2FA required (Code flow)');
             try {
                 const passwordInfo = await tg.call({ _: 'account.getPassword' });
                 callbacks.onStateChange({
@@ -123,7 +130,8 @@ export async function submitCode(
                     hint: passwordInfo.hint ?? undefined,
                 });
                 return;
-            } catch {
+            } catch (e) {
+                console.error('Failed to get password info:', e);
                 callbacks.onStateChange({
                     step: '2fa',
                     hint: undefined,
@@ -269,7 +277,14 @@ function pollQRLogin(expires: number, callbacks: AuthCallbacks): void {
             if (cancelled) return;
 
             // Check for 2FA requirement
-            if (error instanceof Error && error.message.includes('SESSION_PASSWORD_NEEDED')) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const err = error as any;
+            if (
+                (error instanceof Error && error.message.includes('SESSION_PASSWORD_NEEDED')) ||
+                err?.text === 'SESSION_PASSWORD_NEEDED' ||
+                err?.message === 'SESSION_PASSWORD_NEEDED'
+            ) {
+                console.log('2FA required (QR flow)');
                 cancelQRPolling = null;
                 try {
                     const passwordInfo = await tg.call({ _: 'account.getPassword' });
@@ -277,7 +292,8 @@ function pollQRLogin(expires: number, callbacks: AuthCallbacks): void {
                         step: '2fa',
                         hint: passwordInfo.hint ?? undefined,
                     });
-                } catch {
+                } catch (e) {
+                    console.error('Failed to get password info:', e);
                     callbacks.onStateChange({
                         step: '2fa',
                         hint: undefined,
@@ -285,6 +301,8 @@ function pollQRLogin(expires: number, callbacks: AuthCallbacks): void {
                 }
                 return;
             }
+
+            console.error('QR polling error:', error);
 
             if (!cancelled) {
                 timeoutId = setTimeout(poll, 2000);
