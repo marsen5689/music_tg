@@ -344,6 +344,8 @@ export const fetchAudioFiles = async (
         console.log('fetchAudioFiles: Current user ID:', me.id.toString());
 
         // Get target peer
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const targetId = chatId || me.id.toString();
         let targetPeer: Parameters<typeof tg.getMessages>[0];
 
         if (chatId) {
@@ -399,6 +401,9 @@ export const fetchAudioFiles = async (
                             duration,
                             url: '',
                             albums: [],
+                            messageId: message.id,
+                            chatId: targetId,
+                            mimeType: mimeType || 'audio/mpeg',
                         };
 
                         console.log(`Found track: ${title} - ${artist}`);
