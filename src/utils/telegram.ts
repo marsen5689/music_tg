@@ -33,7 +33,6 @@ export const connectWithQR = async (
 
     await client.connect();
 
-    // Кешируем пароль
     let passwordCache: string | null = null;
 
     const user = await client.signInUserWithQrCode(
@@ -47,8 +46,8 @@ export const connectWithQR = async (
                     passwordCache = await onPasswordRequired(hint);
                     console.log('Password cached, type:', typeof passwordCache, 'length:', passwordCache?.length);
                 }
-                // Возвращаем кешированное значение
-                return passwordCache || '';
+                // Возвращаем как Buffer
+                return Buffer.from(passwordCache || '', 'utf-8');
             },
             onError: async (err) => {
                 console.error('QR Auth error:', err);
@@ -83,7 +82,6 @@ export const connectWithPhone = async (
 
     const code = await onCodeRequired();
 
-    // Получаем пароль заранее, если потребуется
     let passwordCache: string | null = null;
 
     await client.signInUser(
@@ -99,8 +97,8 @@ export const connectWithPhone = async (
                     passwordCache = await onPasswordRequired(hint);
                     console.log('Password cached, type:', typeof passwordCache, 'length:', passwordCache?.length);
                 }
-                // Возвращаем кешированное значение
-                return passwordCache || '';
+                // Возвращаем как Buffer
+                return Buffer.from(passwordCache || '', 'utf-8');
             },
             onError: async (err) => {
                 console.error('Phone Auth error:', err);
