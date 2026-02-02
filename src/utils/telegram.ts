@@ -46,8 +46,7 @@ export const connectWithQR = async (
                     passwordCache = await onPasswordRequired(hint);
                     console.log('Password cached, type:', typeof passwordCache, 'length:', passwordCache?.length);
                 }
-                // Возвращаем как Buffer
-                return Buffer.from(passwordCache || '', 'utf-8');
+                return Buffer.from(passwordCache || '', 'utf-8') as any;
             },
             onError: async (err) => {
                 console.error('QR Auth error:', err);
@@ -97,8 +96,7 @@ export const connectWithPhone = async (
                     passwordCache = await onPasswordRequired(hint);
                     console.log('Password cached, type:', typeof passwordCache, 'length:', passwordCache?.length);
                 }
-                // Возвращаем как Buffer
-                return Buffer.from(passwordCache || '', 'utf-8');
+                return Buffer.from(passwordCache || '', 'utf-8') as any;
             },
             onError: async (err) => {
                 console.error('Phone Auth error:', err);
