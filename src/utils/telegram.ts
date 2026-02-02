@@ -467,7 +467,7 @@ export const downloadAudioFile = async (
             throw new Error('Message not found');
         }
 
-        if (!message.media || message.media.type !== 'document') {
+        if (!message.media || (message.media.type !== 'document' && message.media.type !== 'audio')) {
             throw new Error('Message has no audio');
         }
 
