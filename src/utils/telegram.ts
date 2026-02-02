@@ -570,7 +570,7 @@ export const downloadAudioFileStreaming = async (
         const messages = await tg.getMessages(targetPeer, [messageId]);
         const message = messages[0];
 
-        if (!message || !message.media || message.media.type !== 'document') {
+        if (!message || !message.media || (message.media.type !== 'document' && message.media.type !== 'audio')) {
             throw new Error('Media not found');
         }
 
