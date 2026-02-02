@@ -1105,9 +1105,14 @@
     }
 
     .track-list-header {
+        position: sticky;
+        top: -16px;
         margin: -16px -16px 16px -16px;
         padding: 12px 16px;
         width: calc(100% + 32px);
+        background: rgba(20, 20, 20, 0.9);
+        backdrop-filter: blur(20px);
+        z-index: 200;
     }
 
     .track-item {
