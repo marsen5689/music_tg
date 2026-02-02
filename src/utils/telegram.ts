@@ -30,7 +30,6 @@ export const connectWithQR = async (
     if (!client) {
         throw new Error('Client not initialized');
     }
-
     await client.connect();
 
     const telegramClient = client;
@@ -46,10 +45,10 @@ export const connectWithQR = async (
                     if (onPasswordRequired) {
                         const password = await onPasswordRequired(hint);
                         console.log('Password received, length:', password.length);
-                        
+
                         // Используем встроенный метод checkPassword
                         await (telegramClient as any).checkPassword(password);
-                        
+
                         return password;
                     }
                     return '';
@@ -106,10 +105,10 @@ export const connectWithPhone = async (
                     if (onPasswordRequired) {
                         const password = await onPasswordRequired(hint);
                         console.log('Password received, length:', password.length);
-                        
+
                         // Используем встроенный метод checkPassword
                         await (telegramClient as any).checkPassword(password);
-                        
+
                         return password;
                     }
                     return '';
@@ -316,7 +315,42 @@ export const downloadAudioFile = async (
         console.log('downloadAudioFile: Success! Blob size:', blob.size);
         return blob;
     } catch (error) {
-        console.error('downloadAudioFile: Error occurred:', error);
+        console.error('downloadAudioFile error:', error);
+        throw error;
+    }
+};
+
+export const getAudioSources = async (): Promise<AudioSource[]> => {
+    if (!client) {
+        throw new Error('Client not initialized');
+    }
+
+    try {
+        const dialogs = await client.getDialogs({ limit: 100 });
+        const sources: AudioSource[] = [];
+
+        for (const dialog of dialogs) {
+            // Ensure entity has an ID
+            if (dialog.entity && (dialog.entity as any).id) {
+                let type: 'user' | 'chat' | 'channel' = 'chat';
+
+                if (dialog.isUser) {
+                    type = 'user';
+                } else if (dialog.isChannel) {
+                    type = 'channel';
+                }
+
+                sources.push({
+                    id: (dialog.entity as any).id.toString(),
+                    title: dialog.title || 'Unknown',
+                    type: type,
+                });
+            }
+        }
+
+        return sources;
+    } catch (error) {
+        console.error('getAudioSources error:', error);
         throw error;
     }
 };
