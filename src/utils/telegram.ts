@@ -41,7 +41,10 @@ export const connectWithQR = async (
             },
             password: async (hint) => {
                 if (onPasswordRequired) {
-                    return await onPasswordRequired(hint);
+                    const pwd = await onPasswordRequired(hint);
+                    console.log('Password received, length:', pwd.length);
+                    // Убедитесь, что возвращается строка
+                    return String(pwd);
                 }
                 return '';
             },
@@ -85,10 +88,13 @@ export const connectWithPhone = async (
         },
         {
             phoneNumber,
-            phoneCode: async () => code,
+            phoneCode: async () => String(code),
             password: async (hint) => {
                 if (onPasswordRequired) {
-                    return await onPasswordRequired(hint);
+                    const pwd = await onPasswordRequired(hint);
+                    console.log('Password received, length:', pwd.length);
+                    // Убедитесь, что возвращается строка
+                    return String(pwd);
                 }
                 return '';
             },
