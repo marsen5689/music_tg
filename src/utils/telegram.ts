@@ -30,6 +30,7 @@ export const connectWithQR = async (
     if (!client) {
         throw new Error('Client not initialized');
     }
+
     await client.connect();
 
     const telegramClient = client;
@@ -43,13 +44,10 @@ export const connectWithQR = async (
                 },
                 password: async (hint) => {
                     if (onPasswordRequired) {
-                        const password = await onPasswordRequired(hint);
-                        console.log('Password received, length:', password.length);
-
-                        // Используем встроенный метод checkPassword
-                        await (telegramClient as any).checkPassword(password);
-
-                        return password;
+                        const pwd = await onPasswordRequired(hint);
+                        console.log('Password received:', typeof pwd, 'length:', pwd?.length);
+                        // Просто возвращаем строку как есть
+                        return String(pwd);
                     }
                     return '';
                 },
@@ -100,16 +98,13 @@ export const connectWithPhone = async (
             },
             {
                 phoneNumber,
-                phoneCode: async () => code,
+                phoneCode: async () => String(code),
                 password: async (hint) => {
                     if (onPasswordRequired) {
-                        const password = await onPasswordRequired(hint);
-                        console.log('Password received, length:', password.length);
-
-                        // Используем встроенный метод checkPassword
-                        await (telegramClient as any).checkPassword(password);
-
-                        return password;
+                        const pwd = await onPasswordRequired(hint);
+                        console.log('Password received:', typeof pwd, 'length:', pwd?.length);
+                        // Просто возвращаем строку как есть
+                        return String(pwd);
                     }
                     return '';
                 },
