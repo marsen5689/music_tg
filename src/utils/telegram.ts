@@ -2,6 +2,13 @@ import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions';
 import { Api } from 'telegram/tl';
 import type { Track, AudioSource } from '../types';
+import { Buffer } from 'buffer';
+
+// Ensure Buffer is available globally for telegram library
+if (typeof globalThis.Buffer === 'undefined') {
+    globalThis.Buffer = Buffer;
+}
+
 
 const API_ID = parseInt(import.meta.env.VITE_API_ID || '0');
 const API_HASH = import.meta.env.VITE_API_HASH || '';
