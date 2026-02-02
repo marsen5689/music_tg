@@ -330,7 +330,7 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
             <div className="player-header">
                 <div className="player-logo">
                     <span className="player-logo-icon">🎵</span>
-                    <span>Music TG</span>
+                    <span>MusicGram</span>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <button className="logout-button" onClick={handleOpenSettings} title="Settings">
