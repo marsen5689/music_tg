@@ -1,0 +1,1299 @@
+/* =====================================================
+   STYLISH AUDIO PLAYER - Enhanced Modern Design
+   ===================================================== */
+
+:root {
+    --accent-primary: #1DB954;
+    --accent-hover: #1ed760;
+    --accent-glow: rgba(29, 185, 84, 0.4);
+    --text-primary: #ffffff;
+    --text-secondary: #b3b3b3;
+    --bg-dark: #121212;
+    --bg-elevated: #1a1a1a;
+    --bg-glass: rgba(255, 255, 255, 0.05);
+    --border-subtle: rgba(255, 255, 255, 0.1);
+    --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* =====================================================
+   CONTAINER & LAYOUT
+   ===================================================== */
+
+.player-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0f0f0f 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Animated Background Pattern */
+.player-container::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background:
+        radial-gradient(circle at 20% 30%, rgba(29, 185, 84, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(22, 114, 236, 0.06) 0%, transparent 50%),
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02) 0%, transparent 70%);
+    animation: backgroundFloat 20s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes backgroundFloat {
+
+    0%,
+    100% {
+        transform: translate(0, 0) rotate(0deg);
+    }
+
+    50% {
+        transform: translate(-5%, -5%) rotate(5deg);
+    }
+}
+
+/* =====================================================
+   HEADER SECTION
+   ===================================================== */
+
+.player-header {
+    padding: 20px 32px;
+    background: rgba(10, 10, 10, 0.8);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+    position: relative;
+    z-index: 100;
+}
+
+.player-logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--text-primary);
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    letter-spacing: -0.5px;
+}
+
+.player-logo-icon {
+    font-size: 36px;
+    filter: drop-shadow(0 0 12px var(--accent-glow));
+    animation: iconPulse 3s ease-in-out infinite;
+}
+
+@keyframes iconPulse {
+
+    0%,
+    100% {
+        filter: drop-shadow(0 0 12px var(--accent-glow));
+    }
+
+    50% {
+        filter: drop-shadow(0 0 20px var(--accent-glow));
+    }
+}
+
+.logout-button {
+    padding: 10px 28px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 600;
+    border: 1.5px solid rgba(255, 255, 255, 0.12);
+    border-radius: 24px;
+    transition: all var(--transition-normal);
+    backdrop-filter: blur(8px);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.logout-button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.logout-button:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+.logout-button:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+/* =====================================================
+   MAIN CONTENT AREA
+   ===================================================== */
+
+.player-main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    padding: 28px;
+    gap: 28px;
+    position: relative;
+    z-index: 10;
+}
+
+/* =====================================================
+   TRACK LIST CONTAINER - Premium Glass Card
+   ===================================================== */
+
+.track-list-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 32px;
+    background: linear-gradient(135deg,
+            rgba(255, 255, 255, 0.12) 0%,
+            rgba(0, 0, 0, 0.5) 50%,
+            rgba(255, 255, 255, 0.08) 100%);
+    backdrop-filter: blur(40px) brightness(120%) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) brightness(120%) saturate(200%);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-radius: 28px;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.6),
+        0 2px 8px rgba(0, 0, 0, 0.4),
+        inset 0 2px 4px rgba(255, 255, 255, 0.15),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+    position: relative;
+    isolation: isolate;
+}
+
+/* Ambient Glow Effect */
+.track-list-container::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(135deg, var(--accent-primary), #1672ec);
+    border-radius: 28px;
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+    z-index: -1;
+    filter: blur(20px);
+}
+
+/* =====================================================
+   TRACK LIST HEADER
+   ===================================================== */
+
+.track-list-header {
+    position: sticky;
+    top: -8px;
+    z-index: 100;
+    padding: 16px 24px;
+    margin: -16px -16px 24px -16px;
+    background: rgba(20, 20, 20, 0.5);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.track-list-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.5px;
+    color: var(--text-primary);
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+/* Track Count Badge */
+.track-count {
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 700;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 6px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
+    margin-left: 12px;
+}
+
+/* Search Container Styles */
+.search-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.search-container:focus-within {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.05);
+}
+
+.search-icon {
+    font-size: 16px;
+    opacity: 0.6;
+}
+
+.search-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 16px;
+    width: 100%;
+    font-family: inherit;
+    font-weight: 500;
+}
+
+.search-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* =====================================================
+   TRACK LIST ITEMS
+   ===================================================== */
+
+.track-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.track-item {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 18px 24px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    transition: all var(--transition-fast);
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+}
+
+/* Hover Shine Effect */
+.track-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(255, 255, 255, 0.1),
+            transparent);
+    transition: left 0.5s;
+    z-index: -1;
+}
+
+.track-item:hover::before {
+    left: 100%;
+}
+
+.track-item:hover {
+    background: rgba(255, 255, 255, 0.12);
+    transform: translateX(8px) scale(1.02);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.4),
+        0 0 40px rgba(29, 185, 84, 0.1);
+}
+
+.track-item.active {
+    background: linear-gradient(135deg,
+            rgba(29, 185, 84, 0.25) 0%,
+            rgba(29, 185, 84, 0.15) 100%);
+    border-color: rgba(29, 185, 84, 0.5);
+    box-shadow:
+        0 8px 24px rgba(29, 185, 84, 0.3),
+        inset 0 1px 2px rgba(255, 255, 255, 0.2);
+}
+
+.track-item.playing {
+    animation: pulseGlow 2s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+
+    0%,
+    100% {
+        box-shadow: 0 8px 24px rgba(29, 185, 84, 0.3);
+    }
+
+    50% {
+        box-shadow: 0 8px 32px rgba(29, 185, 84, 0.5);
+    }
+}
+
+.track-number {
+    width: 32px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.track-item.active .track-number,
+.track-item.playing .track-number {
+    color: var(--accent-primary);
+    text-shadow: 0 0 12px var(--accent-glow);
+    font-weight: 800;
+}
+
+.track-play-icon {
+    font-size: 18px;
+    filter: drop-shadow(0 0 8px var(--accent-primary));
+    animation: playIconSpin 1s linear infinite;
+}
+
+@keyframes playIconSpin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.track-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.track-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: -0.2px;
+}
+
+.track-item.playing .track-title {
+    color: var(--accent-primary);
+    text-shadow: 0 0 8px var(--accent-glow);
+}
+
+.track-artist {
+    font-size: 14px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+}
+
+.track-duration {
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* =====================================================
+   PLAYER CONTROLS - Floating Bottom Bar
+   ===================================================== */
+
+.player-controls-container {
+    margin: 0 28px 28px;
+    border-radius: 24px;
+    background: linear-gradient(135deg,
+            rgba(40, 40, 40, 0.9) 0%,
+            rgba(20, 20, 20, 0.95) 100%);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    padding: 24px 36px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.6),
+        0 0 80px rgba(29, 185, 84, 0.1),
+        inset 0 1px 2px rgba(255, 255, 255, 0.1);
+    z-index: 100;
+    position: relative;
+}
+
+/* Animated Border Gradient */
+.player-controls-container::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 24px;
+    padding: 2px;
+    background: linear-gradient(135deg, var(--accent-primary), #1672ec, var(--accent-primary));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+    animation: borderRotate 3s linear infinite;
+}
+
+.player-controls-container:hover::before {
+    opacity: 0.6;
+}
+
+@keyframes borderRotate {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    100% {
+        background-position: 200% 50%;
+    }
+}
+
+/* =====================================================
+   NOW PLAYING SECTION
+   ===================================================== */
+
+.now-playing {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    width: 320px;
+}
+
+.now-playing-artwork {
+    width: 72px;
+    height: 72px;
+    background: linear-gradient(135deg,
+            rgba(29, 185, 84, 1) 0%,
+            rgba(22, 114, 236, 0.9) 100%);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    box-shadow:
+        0 12px 24px rgba(0, 0, 0, 0.4),
+        0 0 40px var(--accent-glow);
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    position: relative;
+    overflow: hidden;
+    animation: artworkPulse 3s ease-in-out infinite;
+}
+
+@keyframes artworkPulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+/* Rotating Shine Effect */
+.now-playing-artwork::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg,
+            transparent 30%,
+            rgba(255, 255, 255, 0.4) 50%,
+            transparent 70%);
+    transform: rotate(45deg);
+    animation: artworkShine 3s linear infinite;
+}
+
+@keyframes artworkShine {
+    0% {
+        transform: translateX(-100%) translateY(-100%) rotate(45deg);
+    }
+
+    100% {
+        transform: translateX(100%) translateY(100%) rotate(45deg);
+    }
+}
+
+.now-playing-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.now-playing-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: -0.3px;
+}
+
+.now-playing-artist {
+    font-size: 14px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+}
+
+/* =====================================================
+   PLAYER CONTROLS CENTER
+   ===================================================== */
+
+.player-controls {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    max-width: 680px;
+}
+
+/* =====================================================
+   PROGRESS BAR
+   ===================================================== */
+
+.progress-container {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.time-display {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    width: 48px;
+    text-align: center;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 7px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+    overflow: visible;
+    transition: transform var(--transition-fast);
+}
+
+.progress-bar:hover {
+    transform: scaleY(1.2);
+}
+
+.progress-bar:hover .progress-fill {
+    background: var(--accent-hover);
+    box-shadow: 0 0 16px rgba(29, 185, 84, 0.8);
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--accent-primary);
+    border-radius: 4px;
+    position: relative;
+    box-shadow: 0 0 12px var(--accent-glow);
+    transition: all var(--transition-fast);
+}
+
+/* Progress Thumb */
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    right: -8px;
+    top: 50%;
+    transform: translateY(-50%) scale(0);
+    width: 16px;
+    height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow:
+        0 0 12px rgba(0, 0, 0, 0.6),
+        0 0 20px var(--accent-glow);
+    z-index: 5;
+}
+
+.progress-bar:hover .progress-fill::after {
+    transform: translateY(-50%) scale(1);
+}
+
+/* =====================================================
+   CONTROL BUTTONS
+   ===================================================== */
+
+.controls-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    margin-bottom: 4px;
+}
+
+.control-button {
+    width: 44px;
+    height: 44px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.control-button::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.2), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.control-button:hover:not(:disabled)::before {
+    opacity: 1;
+}
+
+.control-button:hover:not(:disabled) {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.15);
+    box-shadow:
+        0 0 20px rgba(255, 255, 255, 0.2),
+        0 8px 16px rgba(0, 0, 0, 0.3);
+}
+
+.control-button:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+.control-button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* Play Button - Hero Element */
+.control-button.play-button {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-hover) 100%);
+    color: #000;
+    font-size: 28px;
+    box-shadow:
+        0 12px 32px rgba(29, 185, 84, 0.6),
+        0 0 60px var(--accent-glow);
+    border: none;
+    position: relative;
+}
+
+.control-button.play-button::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-primary), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: -1;
+    filter: blur(12px);
+}
+
+.control-button.play-button:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent-primary) 100%);
+    transform: scale(1.1);
+    box-shadow:
+        0 16px 40px rgba(29, 185, 84, 0.8),
+        0 0 80px var(--accent-glow);
+}
+
+.control-button.play-button:hover:not(:disabled)::after {
+    opacity: 1;
+}
+
+/* =====================================================
+   VOLUME CONTROLS
+   ===================================================== */
+
+.volume-container {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 320px;
+    justify-content: flex-end;
+}
+
+.volume-icon {
+    color: var(--text-secondary);
+    font-size: 22px;
+    transition: color var(--transition-fast);
+    cursor: pointer;
+}
+
+.volume-icon:hover {
+    color: var(--text-primary);
+}
+
+.volume-slider {
+    width: 120px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+    transition: transform var(--transition-fast);
+}
+
+.volume-slider:hover {
+    transform: scaleY(1.3);
+}
+
+.volume-fill {
+    height: 100%;
+    background: var(--text-primary);
+    border-radius: 3px;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+    transition: all var(--transition-fast);
+}
+
+.volume-slider:hover .volume-fill {
+    box-shadow: 0 0 16px rgba(255, 255, 255, 0.6);
+}
+
+/* =====================================================
+   LOADING & EMPTY STATES
+   ===================================================== */
+
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(20px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+    background: rgba(20, 20, 20, 0.95);
+    padding: 48px 64px;
+    border-radius: 28px;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    box-shadow:
+        0 24px 60px rgba(0, 0, 0, 0.8),
+        0 0 100px var(--accent-glow);
+}
+
+.loading-text {
+    color: var(--text-primary);
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 28px;
+    color: var(--text-secondary);
+}
+
+.empty-icon {
+    font-size: 96px;
+    opacity: 0.6;
+    background: linear-gradient(135deg,
+            rgba(255, 255, 255, 0.6),
+            rgba(255, 255, 255, 0.2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
+    animation: emptyIconFloat 3s ease-in-out infinite;
+}
+
+@keyframes emptyIconFloat {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+.empty-text {
+    font-size: 22px;
+    font-weight: 600;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* =====================================================
+   BUFFER LOADING INDICATOR
+   ===================================================== */
+
+.buffer-loading-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: transparent;
+    z-index: 200;
+    overflow: hidden;
+}
+
+.buffer-loading-bar {
+    height: 100%;
+    background: linear-gradient(90deg,
+            var(--accent-primary),
+            var(--accent-hover),
+            var(--accent-primary));
+    box-shadow: 0 0 16px var(--accent-glow);
+    transition: width 0.2s linear;
+    width: 0%;
+    background-size: 200% 100%;
+    animation: bufferShimmer 2s linear infinite;
+}
+
+@keyframes bufferShimmer {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* =====================================================
+   SCROLLBAR STYLING
+   ===================================================== */
+
+.track-list-container::-webkit-scrollbar {
+    width: 10px;
+}
+
+.track-list-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.track-list-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background var(--transition-fast);
+}
+
+.track-list-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.35);
+    background-clip: padding-box;
+}
+
+/* =====================================================
+   RESPONSIVE DESIGN
+   ===================================================== */
+
+/* Tablet (max-width: 1024px) */
+@media (max-width: 1024px) {
+    .player-main {
+        padding: 20px;
+        gap: 20px;
+    }
+
+    .track-list-container {
+        padding: 24px;
+    }
+
+    .now-playing,
+    .volume-container {
+        width: 240px;
+    }
+
+    .player-controls {
+        max-width: 500px;
+    }
+}
+
+/* Mobile (max-width: 768px) */
+@media (max-width: 768px) {
+    .player-header {
+        padding: 16px 20px;
+    }
+
+    .player-logo {
+        font-size: 22px;
+    }
+
+    .player-logo-icon {
+        font-size: 28px;
+    }
+
+    .logout-button {
+        padding: 8px 20px;
+        font-size: 13px;
+    }
+
+    .player-main {
+        padding: 16px;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .track-list-container {
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 20px;
+    }
+
+    .track-list-header {
+        top: -8px;
+        margin: -8px -8px 16px -8px;
+        padding: 12px 16px;
+        border-radius: 12px;
+    }
+
+    .track-list-title {
+        font-size: 18px;
+    }
+
+    .track-item {
+        padding: 14px 16px;
+        gap: 14px;
+        border-radius: 12px;
+    }
+
+    .track-number {
+        display: none;
+    }
+
+    .track-play-icon {
+        display: block;
+    }
+
+    .player-controls-container {
+        margin: 0;
+        border-radius: 0;
+        border: none;
+        border-top: 2px solid rgba(255, 255, 255, 0.12);
+        padding: 14px 16px;
+        flex-direction: column;
+        gap: 14px;
+        background: rgba(10, 10, 10, 0.98);
+        backdrop-filter: blur(40px);
+        box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.6);
+    }
+
+    .now-playing {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .player-controls {
+        width: 100%;
+        max-width: none;
+    }
+
+    .volume-container {
+        display: none;
+    }
+
+    .controls-buttons {
+        gap: 20px;
+    }
+
+    .control-button {
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+    }
+
+    .control-button.play-button {
+        width: 56px;
+        height: 56px;
+        font-size: 24px;
+    }
+}
+
+/* Small Mobile (max-width: 480px) */
+@media (max-width: 480px) {
+    .player-header {
+        padding: 12px 16px;
+    }
+
+    .track-duration {
+        font-size: 13px;
+    }
+
+    .track-title {
+        font-size: 15px;
+    }
+
+    .track-artist {
+        font-size: 13px;
+    }
+
+    .now-playing-artwork {
+        width: 56px;
+        height: 56px;
+        font-size: 28px;
+    }
+
+    .now-playing-title {
+        font-size: 15px;
+    }
+
+    .now-playing-artist {
+        font-size: 13px;
+    }
+
+    .controls-buttons {
+        gap: 20px;
+    }
+
+    .control-button {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+
+    .control-button.play-button {
+        width: 52px;
+        height: 52px;
+        font-size: 22px;
+    }
+
+    .track-list-title {
+        font-size: 16px;
+    }
+}
+
+/* =====================================================
+   UTILITY ANIMATIONS
+   ===================================================== */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.4s ease-out;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .player-container {
+        background: #000;
+    }
+
+    .track-item {
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+}
+
+/* =====================================================
+   SETTINGS MODAL
+   ===================================================== */
+
+.settings-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.settings-modal {
+    background: rgba(30, 30, 30, 0.8);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    width: 100%;
+    max-width: 480px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+    animation: scaleUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes scaleUp {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.settings-header {
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-header h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.close-button {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 24px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.close-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.settings-sources-list {
+    padding: 24px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.source-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.source-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateX(4px);
+}
+
+.source-item.active {
+    background: rgba(29, 185, 84, 0.15);
+    border-color: rgba(29, 185, 84, 0.5);
+    box-shadow: 0 0 20px rgba(29, 185, 84, 0.1);
+}
+
+.source-icon {
+    font-size: 24px;
+}
+
+.source-name {
+    flex: 1;
+    font-weight: 500;
+    font-size: 16px;
+}
+
+.source-badge {
+    font-size: 12px;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: var(--text-secondary);
+}
