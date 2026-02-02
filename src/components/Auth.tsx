@@ -15,6 +15,38 @@ interface AuthProps {
 type AuthMode = 'qr' | 'phone';
 
 const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
+    // Check if API credentials are present
+    const apiId = import.meta.env.VITE_API_ID;
+    const apiHash = import.meta.env.VITE_API_HASH;
+    const isConfigured = apiId && apiHash && apiId !== '0' && apiId !== '';
+
+    if (!isConfigured) {
+        return (
+            <div className="auth-container fade-in">
+                <div className="auth-card">
+                    <div className="auth-header">
+                        <div className="auth-logo">⚠️</div>
+                        <h1 className="auth-title">Configuration Error</h1>
+                        <p className="auth-subtitle">
+                            Telegram API credentials are missing.
+                        </p>
+                    </div>
+                    <div className="error-message" style={{ textAlign: 'left', background: 'rgba(255, 50, 50, 0.1)', padding: '15px', borderRadius: '8px', marginTop: '20px' }}>
+                        <p><strong>To fix this on GitHub Pages:</strong></p>
+                        <ol style={{ paddingLeft: '20px', marginTop: '10px', lineHeight: '1.6' }}>
+                            <li>Go to <strong>Settings</strong> &rarr; <strong>Secrets and variables</strong> &rarr; <strong>Actions</strong></li>
+                            <li>Add <strong>Repository secret</strong> (not Environment secret):</li>
+                            <li>Name: <code>VITE_API_ID</code>, Value: <i>(your ID numbers)</i></li>
+                            <li>Name: <code>VITE_API_HASH</code>, Value: <i>(your Hash string)</i></li>
+                            <li>Go to <strong>Actions</strong> tab &rarr; Select last workflow &rarr; <strong>Re-run all jobs</strong></li>
+                        </ol>
+                        <p style={{ marginTop: '10px', fontSize: '0.9em' }}>Current value: ID={apiId ? 'Has Value' : 'Empty'}, Hash={apiHash ? 'Has Value' : 'Empty'}</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     const [mode, setMode] = useState<AuthMode>('qr');
     const [phoneNumber, setPhoneNumber] = useState('');
     const [code, setCode] = useState('');
