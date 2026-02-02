@@ -60,7 +60,7 @@ export class StreamingAudioDownloader {
 
                 // Try to set duration from metadata if available
                 try {
-                    if (message.media?.type === 'document' && message.media.type === 'audio') {
+                    if (message.media && (message.media.type === 'audio' || message.media.type === 'document')) {
                         const audio = message.media as { duration?: number };
                         if (audio.duration) {
                             this.mediaSource.duration = audio.duration;
@@ -115,7 +115,7 @@ export class StreamingAudioDownloader {
         message: MessageType,
         onProgress?: (progress: number) => void
     ) {
-        if (!message.media || message.media.type !== 'document') {
+        if (!message.media || (message.media.type !== 'document' && message.media.type !== 'audio')) {
             throw new Error('Invalid media');
         }
 

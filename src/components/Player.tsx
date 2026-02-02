@@ -8,6 +8,12 @@ import {
     getTelegramClient,
     getAudioSources,
 } from '../utils/telegram';
+import {
+    Play, Pause, SkipBack, SkipForward, Volume2,
+    Settings, LogOut, Search, Music, Disc,
+    User, Users, Megaphone, Star, X,
+    AlertCircle, Loader2
+} from 'lucide-react';
 import './Player.css';
 
 interface PlayerProps {
@@ -327,14 +333,15 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
 
             <div className="player-header">
                 <div className="player-logo">
-                    <span className="player-logo-icon">🎵</span>
-                    <span>MusicGram</span>
+                    <Music className="player-logo-icon" size={32} />
+                    <span>Music Tg</span>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <button className="logout-button" onClick={handleOpenSettings} title="Settings">
-                        ⚙️
+                        <Settings size={20} />
                     </button>
-                    <button className="logout-button" onClick={handleLogout}>
+                    <button className="logout-button" onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <LogOut size={16} />
                         Logout
                     </button>
                 </div>
@@ -344,6 +351,7 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
                 <div className="track-list-container">
                     <div className="track-list-header">
                         <div className="search-container">
+                            <Search className="search-icon" size={16} />
                             <input
                                 type="text"
                                 className="search-input"
@@ -359,7 +367,7 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
 
                     {filteredTracks.length === 0 ? (
                         <div className="empty-state">
-                            <div className="empty-icon">🎵</div>
+                            <div className="empty-icon"><Disc size={48} opacity={0.5} /></div>
                             <div className="empty-text">
                                 {searchQuery ? 'No tracks found' : 'No music found in Saved Messages'}
                             </div>
@@ -375,7 +383,7 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
                                 >
                                     <div className="track-number">
                                         {currentTrack?.id === track.id && isPlaying ? (
-                                            <span className="track-play-icon">▶</span>
+                                            <span className="track-play-icon"><Play size={14} fill="currentColor" /></span>
                                         ) : (
                                             index + 1
                                         )}
@@ -397,7 +405,9 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
             {currentTrack && (
                 <div className="player-controls-container">
                     <div className="now-playing">
-                        <div className="now-playing-artwork">🎵</div>
+                        <div className="now-playing-artwork">
+                            <Music size={32} />
+                        </div>
                         <div className="now-playing-info">
                             <div className="now-playing-title">{currentTrack.title}</div>
                             <div className="now-playing-artist">{currentTrack.artist}</div>
@@ -432,25 +442,25 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
                                 onClick={playPrevious}
                                 disabled={!currentTrack}
                             >
-                                ⏮
+                                <SkipBack size={20} fill="currentColor" />
                             </button>
                             <button
                                 className="control-button play-button"
                                 onClick={togglePlayPause}
                                 disabled={!currentTrack}
                             >
-                                {isPlaying ? '⏸' : '▶'}
+                                {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" style={{ marginLeft: '4px' }} />}
                             </button>
                             <button
                                 className="control-button"
                                 onClick={playNext}
                                 disabled={!currentTrack}
                             >
-                                ⏭
+                                <SkipForward size={20} fill="currentColor" />
                             </button>
 
                             <div className="volume-container">
-                                <span className="volume-icon">🔊</span>
+                                <Volume2 size={20} className="volume-icon" />
                                 <div
                                     ref={volumeBarRef}
                                     className="volume-slider"
@@ -470,7 +480,7 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
             {isLoading && tracks.length === 0 && !noTracksFound && (
                 <div className="loading-overlay">
                     <div className="loading-content">
-                        <div className="spinner"></div>
+                        <Loader2 className="spinner-icon" size={48} />
                         <div className="loading-text">
                             Searching for music...
                         </div>
@@ -481,7 +491,7 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
             {noTracksFound && tracks.length === 0 && (
                 <div className="loading-overlay">
                     <div className="loading-content">
-                        <div className="empty-icon">😕</div>
+                        <div className="empty-icon"><AlertCircle size={48} /></div>
                         <div className="loading-text">
                             Nothing found
                         </div>
@@ -500,11 +510,11 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
                     <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
                         <div className="settings-header">
                             <h3>Select Source</h3>
-                            <button className="close-button" onClick={() => setShowSettings(false)}>×</button>
+                            <button className="close-button" onClick={() => setShowSettings(false)}><X size={24} /></button>
                         </div>
                         <div className="settings-search" style={{ padding: '16px 24px 0' }}>
                             <div className="search-container">
-                                <span className="search-icon">🔍</span>
+                                <Search className="search-icon" size={18} />
                                 <input
                                     type="text"
                                     className="search-input"
@@ -523,9 +533,9 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
                                     onClick={() => handleSourceSelect(source.id)}
                                 >
                                     <span className="source-icon">
-                                        {source.title === 'Saved Messages' ? '⭐' :
-                                            source.type === 'channel' ? '📢' :
-                                                source.type === 'user' ? '👤' : '👥'}
+                                        {source.title === 'Saved Messages' ? <Star size={18} /> :
+                                            source.type === 'channel' ? <Megaphone size={18} /> :
+                                                source.type === 'user' ? <User size={18} /> : <Users size={18} />}
                                     </span>
                                     <span className="source-name">{source.title}</span>
                                     {source.type === 'channel' && <span className="source-badge">Channel</span>}

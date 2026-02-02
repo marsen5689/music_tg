@@ -1322,3 +1322,8 @@
     border-radius: 8px;
     color: var(--text-secondary);
 }
+
+.spinner-icon {
+    animation: spin 1s linear infinite;
+    color: var(--accent-primary);
+}

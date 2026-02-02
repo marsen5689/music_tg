@@ -9,6 +9,7 @@ import {
     stopQRAuth,
     type AuthState,
 } from '../utils/telegram';
+import { AlertTriangle, Music, Smartphone, QrCode } from 'lucide-react';
 import './Auth.css';
 
 interface AuthProps {
@@ -28,7 +29,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
             <div className="auth-container fade-in">
                 <div className="auth-card">
                     <div className="auth-header">
-                        <div className="auth-logo">⚠️</div>
+                        <div className="auth-logo">
+                            <AlertTriangle size={40} className="warning-icon" />
+                        </div>
                         <h1 className="auth-title">Configuration Error</h1>
                         <p className="auth-subtitle">
                             Telegram API credentials are missing.
@@ -300,7 +303,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
         <div className="auth-container fade-in">
             <div className="auth-card">
                 <div className="auth-header">
-                    <div className="auth-logo">🎵</div>
+                    <div className="auth-logo">
+                        <Music size={48} className="auth-logo-icon" />
+                    </div>
                     <h1 className="auth-title">Music TG</h1>
                     <p className="auth-subtitle">
                         Connect your Telegram to access your music
@@ -311,13 +316,17 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
                     <button
                         className={`auth-tab ${mode === 'qr' ? 'active' : ''}`}
                         onClick={() => handleModeChange('qr')}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                     >
+                        <QrCode size={18} />
                         QR Code
                     </button>
                     <button
                         className={`auth-tab ${mode === 'phone' ? 'active' : ''}`}
                         onClick={() => handleModeChange('phone')}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                     >
+                        <Smartphone size={18} />
                         Phone Number
                     </button>
                 </div>
