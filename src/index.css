@@ -39,8 +39,15 @@ body {
     radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
     radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
   color: var(--text-primary);
-  overflow: hidden;
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
   position: relative;
+}
+
+html {
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 body::before {
@@ -69,9 +76,11 @@ body::before {
 }
 
 #root {
-  width: 100vw;
+  width: 100%;
+  max-width: 100vw;
   height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* Scrollbar Styling */
