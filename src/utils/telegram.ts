@@ -43,12 +43,28 @@ export const connectWithQR = async (
                     onQRCode(code);
                 },
                 password: async (hint) => {
-                    if (onPasswordRequired) {
-                        const pwd = await onPasswordRequired(hint);
-                        // Важно: возвращаем только строку и убеждаемся, что она не пустая
-                        return String(pwd || '');
+                    try {
+                        if (onPasswordRequired) {
+                            console.log('[QR Auth] Password requested, hint:', hint);
+                            const pwd = await onPasswordRequired(hint);
+                            console.log('[QR Auth] Password received, type:', typeof pwd, 'value:', pwd ? '***' : 'empty');
+
+                            // Ensure we always return a string
+                            if (pwd === null || pwd === undefined) {
+                                console.error('[QR Auth] Password is null/undefined');
+                                return '';
+                            }
+
+                            const passwordStr = String(pwd).trim();
+                            console.log('[QR Auth] Returning password, length:', passwordStr.length);
+                            return passwordStr;
+                        }
+                        console.log('[QR Auth] No password handler provided');
+                        return '';
+                    } catch (error) {
+                        console.error('[QR Auth] Error in password callback:', error);
+                        throw error;
                     }
-                    return '';
                 },
                 onError: async (err) => {
                     console.error('QR Auth error:', err);
@@ -99,13 +115,28 @@ export const connectWithPhone = async (
                 phoneNumber,
                 phoneCode: async () => String(code),
                 password: async (hint) => {
-                    if (onPasswordRequired) {
-                        const pwd = await onPasswordRequired(hint);
-                        console.log('Password received:', typeof pwd, 'length:', pwd?.length);
-                        // Просто возвращаем строку как есть
-                        return String(pwd);
+                    try {
+                        if (onPasswordRequired) {
+                            console.log('[Phone Auth] Password requested, hint:', hint);
+                            const pwd = await onPasswordRequired(hint);
+                            console.log('[Phone Auth] Password received, type:', typeof pwd, 'value:', pwd ? '***' : 'empty');
+
+                            // Ensure we always return a string
+                            if (pwd === null || pwd === undefined) {
+                                console.error('[Phone Auth] Password is null/undefined');
+                                return '';
+                            }
+
+                            const passwordStr = String(pwd).trim();
+                            console.log('[Phone Auth] Returning password, length:', passwordStr.length);
+                            return passwordStr;
+                        }
+                        console.log('[Phone Auth] No password handler provided');
+                        return '';
+                    } catch (error) {
+                        console.error('[Phone Auth] Error in password callback:', error);
+                        throw error;
                     }
-                    return '';
                 },
                 onError: async (err) => {
                     console.error('Phone Auth error:', err);

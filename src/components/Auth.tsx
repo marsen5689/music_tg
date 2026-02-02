@@ -171,12 +171,17 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
     };
 
     const handlePasswordSubmit = () => {
+        console.log('[Auth] handlePasswordSubmit called, password length:', password.length, 'has resolver:', !!passwordResolverRef.current);
         if (password.length > 0 && passwordResolverRef.current) {
             setIsLoading(true);
+            console.log('[Auth] Resolving password promise with value of length:', password.length);
             passwordResolverRef.current(password);
             passwordResolverRef.current = null;
+        } else {
+            console.warn('[Auth] Cannot submit password - missing password or resolver');
         }
     };
+
 
     return (
         <div className="auth-container fade-in">
