@@ -33,6 +33,9 @@ export const connectWithQR = async (
 
     await client.connect();
 
+    // Кешируем пароль
+    let passwordCache: string | null = null;
+
     const user = await client.signInUserWithQrCode(
         { apiId: API_ID, apiHash: API_HASH },
         {
@@ -40,13 +43,12 @@ export const connectWithQR = async (
                 onQRCode(code);
             },
             password: async (hint) => {
-                if (onPasswordRequired) {
-                    const pwd = await onPasswordRequired(hint);
-                    console.log('Password received, length:', pwd.length);
-                    // Убедитесь, что возвращается строка
-                    return String(pwd);
+                if (!passwordCache && onPasswordRequired) {
+                    passwordCache = await onPasswordRequired(hint);
+                    console.log('Password cached, type:', typeof passwordCache, 'length:', passwordCache?.length);
                 }
-                return '';
+                // Возвращаем кешированное значение
+                return passwordCache || '';
             },
             onError: async (err) => {
                 console.error('QR Auth error:', err);
@@ -81,6 +83,9 @@ export const connectWithPhone = async (
 
     const code = await onCodeRequired();
 
+    // Получаем пароль заранее, если потребуется
+    let passwordCache: string | null = null;
+
     await client.signInUser(
         {
             apiId: API_ID,
@@ -88,15 +93,14 @@ export const connectWithPhone = async (
         },
         {
             phoneNumber,
-            phoneCode: async () => String(code),
+            phoneCode: async () => code,
             password: async (hint) => {
-                if (onPasswordRequired) {
-                    const pwd = await onPasswordRequired(hint);
-                    console.log('Password received, length:', pwd.length);
-                    // Убедитесь, что возвращается строка
-                    return String(pwd);
+                if (!passwordCache && onPasswordRequired) {
+                    passwordCache = await onPasswordRequired(hint);
+                    console.log('Password cached, type:', typeof passwordCache, 'length:', passwordCache?.length);
                 }
-                return '';
+                // Возвращаем кешированное значение
+                return passwordCache || '';
             },
             onError: async (err) => {
                 console.error('Phone Auth error:', err);
