@@ -45,6 +45,8 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
     const volumeBarRef = useRef<HTMLDivElement>(null);
     const trackCacheRef = useRef<Map<string, string>>(new Map()); // Cache for track URLs
     const cleanupRef = useRef<(() => void) | null>(null); // Cleanup for streaming
+    const nextTrackTriggerRef = useRef<(() => void) | null>(null);
+    const loadingTrackIdRef = useRef<string | null>(null);
 
     const loadTracks = async () => {
         setIsLoading(true);
@@ -118,6 +120,8 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
 
 
 
+    const [pendingTrack, setPendingTrack] = useState<Track | null>(null);
+
     const playTrack = async (track: Track) => {
         if (currentTrack?.id === track.id && audioRef.current) {
             // Toggle play/pause for current track
@@ -131,12 +135,13 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
             return;
         }
 
-        // Load and play new track
-        // Don't stop current track yet, let it play while buffering
-        setIsBuffering(true);
-        // We do NOT set isLoading(true) here to avoid the full blocking overlay
+        // New track selected
+        setPendingTrack(track);
+        loadingTrackIdRef.current = track.id;
 
-        // Reset progress but keep current track playing info
+        // Do NOT set currentTrack or isBuffering yet. 
+        // We want the old track to keep playing.
+
         setLoadingProgress(0);
 
         try {
@@ -157,78 +162,130 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
                         track.mimeType,
                         track.chatId,
                         (progress) => {
-                            setLoadingProgress(progress);
+                            if (loadingTrackIdRef.current === track.id) {
+                                setLoadingProgress(progress);
+                            }
                         }
                     );
                     url = result.url;
                     cleanup = result.cleanup;
                     console.log('Using streaming playback');
                 } catch (streamError) {
+                    if (loadingTrackIdRef.current !== track.id) return;
                     console.warn('Streaming failed, falling back to regular download:', streamError);
                     // Fallback to regular regular download
                     const blob = await downloadAudioFile(track.messageId, track.chatId, (progress) => {
-                        setLoadingProgress(progress);
+                        if (loadingTrackIdRef.current === track.id) {
+                            setLoadingProgress(progress);
+                        }
                     });
                     url = URL.createObjectURL(blob);
+                }
+
+                if (loadingTrackIdRef.current !== track.id) {
+                    // Request cancelled
+                    if (cleanup) cleanup();
+                    return;
                 }
 
                 // Cache the URL only if it's a full download (no cleanup function)
                 if (!cleanup) {
                     trackCacheRef.current.set(track.id, url);
-                    console.log('Track cached:', track.title);
                 }
             }
 
-            // ONLY NOW we stop the previous track and switch
+            // Clean up previous pending download if any
             if (cleanupRef.current) {
                 cleanupRef.current();
                 cleanupRef.current = null;
             }
+            if (cleanup) {
+                cleanupRef.current = cleanup;
+            }
 
-            if (audioRef.current) {
-                // Pause old track
-                audioRef.current.pause();
+            // Create new Audio instance for the next track
+            const nextAudio = new Audio(url);
+            nextAudio.volume = volume;
 
-                // Set new source
-                audioRef.current.src = url;
-                audioRef.current.load();
+            // Wait for it to be ready to play
+            nextAudio.oncanplay = async () => {
+                // Ensure this is still the requested track
+                if (loadingTrackIdRef.current !== track.id) return;
 
-                // Store cleanup for next track change
-                if (cleanup) {
-                    cleanupRef.current = cleanup;
+                // Stop the old track
+                if (audioRef.current) {
+                    audioRef.current.pause();
+                    audioRef.current.src = '';
+                    audioRef.current.ontimeupdate = null;
+                    audioRef.current.onended = null;
                 }
 
-                audioRef.current.onloadedmetadata = () => {
-                    setDuration(audioRef.current!.duration);
-                    audioRef.current!.play();
-                    setIsPlaying(true);
-                    setCurrentTrack(track);
-                    setIsBuffering(false);
+                // Swap references
+                audioRef.current = nextAudio;
+
+                // Setup listeners on the new active audio
+                nextAudio.ontimeupdate = () => {
+                    setCurrentTime(nextAudio.currentTime);
                 };
 
-                audioRef.current.ontimeupdate = () => {
-                    setCurrentTime(audioRef.current!.currentTime);
+                nextAudio.onended = () => {
+                    nextTrackTriggerRef.current?.();
                 };
 
-                audioRef.current.onended = () => {
-                    playNext();
-                };
-            }
+                // Update UI state
+                setCurrentTrack(track);
+                setPendingTrack(null);
+                setIsBuffering(false);
+                setDuration(nextAudio.duration || 0);
+                setIsPlaying(true);
+
+                try {
+                    await nextAudio.play();
+                } catch (e) {
+                    console.error("Playback failed", e);
+                }
+            };
+
+            nextAudio.onerror = (e) => {
+                if (loadingTrackIdRef.current !== track.id) {
+                    console.log('Ignored error for cancelled track load:', track.title);
+                    return;
+                }
+                console.error("Error loading new track", e);
+                setPendingTrack(null);
+                alert("Failed to load track");
+            };
+
+            // Trigger load
+            nextAudio.load();
+
         } catch (error) {
+            if (loadingTrackIdRef.current !== track.id) return;
             console.error('Failed to play track:', error);
-            console.error('Error details:', {
-                message: error instanceof Error ? error.message : 'Unknown error',
-                stack: error instanceof Error ? error.stack : undefined,
-                error
-            });
-            alert(`Failed to play track: ${error instanceof Error ? error.message : 'Unknown error'}. Check console for details.`);
-            setIsBuffering(false);
+            setPendingTrack(null);
+            alert(`Failed to play track: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     };
 
-    const playNext = () => {
-        if (!currentTrack) return;
 
+
+    const playNext = () => {
+        // We look up based on the *latest* currentTrack state or the passed ID? 
+        // playNext uses 'currentTrack' from state.
+        // But if we are in the middle of a transition, currentTrack is the OLD one. 
+        // playNext should find the one AFTER the OLD one? 
+        // Yes, that's correct behavior for "skip".
+        // But for "onEnded", currentTrack is the one that just finished. Correct.
+
+        // We need to access the LATEST currentTrack.
+        // Since playNext is recreated on render (it uses closure state), it should be fine IF 
+        // we keep the onended listener up to date.
+        // But we attach onended ONCE when swapping.
+        // So we need `nextTrackTriggerRef` to always point to the fresh playNext.
+        // And the listener calls `nextTrackTriggerRef.current()`.
+
+        // Logic for playNext:
+        if (!currentTrack) return;
         const currentIndex = tracks.findIndex(t => t.id === currentTrack.id);
         if (currentIndex < tracks.length - 1) {
             playTrack(tracks[currentIndex + 1]);
@@ -237,7 +294,6 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
 
     const playPrevious = () => {
         if (!currentTrack) return;
-
         const currentIndex = tracks.findIndex(t => t.id === currentTrack.id);
         if (currentIndex > 0) {
             playTrack(tracks[currentIndex - 1]);
@@ -255,6 +311,29 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
             setIsPlaying(true);
         }
     };
+
+    // Keep the nextTrackTriggerRef updated with the latest playNext closure
+    useEffect(() => {
+        nextTrackTriggerRef.current = playNext;
+    }, [playNext]);
+
+    // Initial audio setup (empty, but ensuring ref is controlled if needed)
+    useEffect(() => {
+        if (!audioRef.current) {
+            audioRef.current = new Audio();
+        }
+
+        return () => {
+            // Cleanup on unmount
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current = null;
+            }
+            if (cleanupRef.current) {
+                cleanupRef.current();
+            }
+        };
+    }, []);
 
     const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (!audioRef.current || !progressBarRef.current) return;
@@ -329,7 +408,7 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
 
     return (
         <div className="player-container fade-in">
-            <audio ref={audioRef} />
+            {/* audio element is managed via new Audio() */}
 
             <div className="player-header">
                 <div className="player-logo">
@@ -382,7 +461,9 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
                                     onClick={() => playTrack(track)}
                                 >
                                     <div className="track-number">
-                                        {currentTrack?.id === track.id && isPlaying ? (
+                                        {pendingTrack?.id === track.id ? (
+                                            <Loader2 className="animate-spin" size={14} />
+                                        ) : currentTrack?.id === track.id && isPlaying ? (
                                             <span className="track-play-icon"><Play size={14} fill="currentColor" /></span>
                                         ) : (
                                             index + 1

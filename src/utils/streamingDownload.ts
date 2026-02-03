@@ -40,7 +40,11 @@ export class StreamingAudioDownloader {
         // Start the download in the background via the writable side
         this.downloadToStream(client, message, writable, onProgress);
 
-        return `/stream/${streamId}`;
+        const baseUrl = import.meta.env.BASE_URL.endsWith('/')
+            ? import.meta.env.BASE_URL
+            : import.meta.env.BASE_URL + '/';
+
+        return `${baseUrl}stream/${streamId}`;
     }
 
     private async downloadToStream(
