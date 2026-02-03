@@ -18,8 +18,12 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
-    if (url.pathname.startsWith('/stream/')) {
-        const id = url.pathname.split('/stream/')[1];
+
+    // Robust check for /stream/{id} that handles base paths (e.g. /repo/stream/123)
+    const streamMatch = url.pathname.match(/\/stream\/([^/]+)$/);
+
+    if (streamMatch) {
+        const id = streamMatch[1];
         const data = map.get(id);
 
         if (data) {
@@ -30,15 +34,9 @@ self.addEventListener('fetch', (event) => {
             if (data.size) {
                 headers.set('Content-Length', data.size);
             }
-            headers.set('Accept-Ranges', 'bytes'); // Fake support implies we assume browser handles continuous stream
+            headers.set('Accept-Ranges', 'bytes');
 
             event.respondWith(new Response(data.stream, { headers }));
-
-            // We can remove the stream from map if it's one-time use, 
-            // but keeping it allows re-requests (seeking partially works if browser buffers)
-            // For now, let's keep it until explicitly cleared? 
-            // Actually, Response consumes the stream, so we can't reuse it easily without teeing.
-            // So we remove it.
             map.delete(id);
         }
     }
