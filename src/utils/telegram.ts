@@ -6,6 +6,7 @@ const API_HASH = import.meta.env.VITE_API_HASH || '';
 const STORAGE_KEY = 'music_tg_session';
 
 let client: TelegramClient | null = null;
+const peerCache = new Map<string, unknown>();
 
 // Auth state type for managing authentication flow
 export type AuthState =
@@ -324,7 +325,33 @@ export async function logout(): Promise<void> {
             console.warn('Error during logout:', error);
         }
         client = null;
+        peerCache.clear();
     }
+}
+
+async function resolveTargetPeer(
+    tg: TelegramClient,
+    chatId?: string
+): Promise<Parameters<typeof tg.getMessages>[0]> {
+    if (!chatId) {
+        return 'me';
+    }
+
+    const cachedPeer = peerCache.get(chatId);
+    if (cachedPeer) {
+        return cachedPeer as Parameters<typeof tg.getMessages>[0];
+    }
+
+    for await (const dialog of tg.iterDialogs()) {
+        const dialogId = dialog.peer.id.toString();
+        peerCache.set(dialogId, dialog.peer.inputPeer);
+
+        if (dialogId === chatId) {
+            return dialog.peer.inputPeer;
+        }
+    }
+
+    throw new Error('Chat not found');
 }
 
 /**
@@ -343,27 +370,8 @@ export const fetchAudioFiles = async (
         const me = await tg.getMe();
         console.log('fetchAudioFiles: Current user ID:', me.id.toString());
 
-        // Get target peer
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const targetId = chatId || me.id.toString();
-        let targetPeer: Parameters<typeof tg.getMessages>[0];
-
-        if (chatId) {
-            let targetDialog = null;
-            for await (const dialog of tg.iterDialogs()) {
-                if (dialog.peer.id.toString() === chatId) {
-                    targetDialog = dialog;
-                    break;
-                }
-            }
-            if (targetDialog) {
-                targetPeer = targetDialog.peer.inputPeer;
-            } else {
-                throw new Error('Chat not found');
-            }
-        } else {
-            targetPeer = 'me';
-        }
+        const targetPeer = await resolveTargetPeer(tg, chatId);
 
         console.log('fetchAudioFiles: Fetching messages...');
 
@@ -440,24 +448,7 @@ export const downloadAudioFile = async (
 
         await tg.connect();
 
-        let targetPeer: Parameters<typeof tg.getMessages>[0];
-
-        if (chatId) {
-            let targetDialog = null;
-            for await (const dialog of tg.iterDialogs()) {
-                if (dialog.peer.id.toString() === chatId) {
-                    targetDialog = dialog;
-                    break;
-                }
-            }
-            if (targetDialog) {
-                targetPeer = targetDialog.peer.inputPeer;
-            } else {
-                throw new Error('Chat not found');
-            }
-        } else {
-            targetPeer = 'me';
-        }
+        const targetPeer = await resolveTargetPeer(tg, chatId);
 
         // Get the message
         const messages = await tg.getMessages(targetPeer, [messageId]);
@@ -523,6 +514,7 @@ export const getAudioSources = async (): Promise<AudioSource[]> => {
                 title: peer.displayName || 'Unknown',
                 type: type,
             });
+            peerCache.set(peer.id.toString(), peer.inputPeer);
         }
 
         return sources;
@@ -548,24 +540,7 @@ export const downloadAudioFileStreaming = async (
 
         await tg.connect();
 
-        let targetPeer: Parameters<typeof tg.getMessages>[0];
-
-        if (chatId) {
-            let targetDialog = null;
-            for await (const dialog of tg.iterDialogs()) {
-                if (dialog.peer.id.toString() === chatId) {
-                    targetDialog = dialog;
-                    break;
-                }
-            }
-            if (targetDialog) {
-                targetPeer = targetDialog.peer.inputPeer;
-            } else {
-                throw new Error('Chat not found');
-            }
-        } else {
-            targetPeer = 'me';
-        }
+        const targetPeer = await resolveTargetPeer(tg, chatId);
 
         const messages = await tg.getMessages(targetPeer, [messageId]);
         const message = messages[0];

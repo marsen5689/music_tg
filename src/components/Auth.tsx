@@ -1,15 +1,24 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
     initTelegramClient,
     startPhoneAuth,
-    submitCode,
-    submit2FA,
     startQRAuth,
     stopQRAuth,
+    submit2FA,
+    submitCode,
     type AuthState,
 } from '../utils/telegram';
-import { AlertTriangle, Music, Smartphone, QrCode } from 'lucide-react';
+import {
+    AlertTriangle,
+    LockKeyhole,
+    Music,
+    QrCode,
+    ShieldCheck,
+    Smartphone,
+    Sparkles,
+    Waves,
+} from 'lucide-react';
 import './Auth.css';
 
 interface AuthProps {
@@ -19,35 +28,35 @@ interface AuthProps {
 type AuthMode = 'qr' | 'phone';
 
 const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
-    // Check if API credentials are present
     const apiId = import.meta.env.VITE_API_ID;
     const apiHash = import.meta.env.VITE_API_HASH;
     const isConfigured = apiId && apiHash && apiId !== '0' && apiId !== '';
 
     if (!isConfigured) {
         return (
-            <div className="auth-container fade-in">
-                <div className="auth-card">
-                    <div className="auth-header">
-                        <div className="auth-logo">
-                            <AlertTriangle size={40} className="warning-icon" />
+            <div className="auth-scene fade-in">
+                <div className="auth-grid">
+                    <section className="auth-story auth-story--error">
+                        <div className="auth-story__badge">
+                            <AlertTriangle size={14} />
+                            <span>Configuration required</span>
                         </div>
-                        <h1 className="auth-title">Configuration Error</h1>
-                        <p className="auth-subtitle">
-                            Telegram API credentials are missing.
-                        </p>
-                    </div>
-                    <div className="error-message" style={{ textAlign: 'left', background: 'rgba(255, 50, 50, 0.1)', padding: '15px', borderRadius: '8px', marginTop: '20px' }}>
-                        <p><strong>To fix this on GitHub Pages:</strong></p>
-                        <ol style={{ paddingLeft: '20px', marginTop: '10px', lineHeight: '1.6' }}>
-                            <li>Go to <strong>Settings</strong> &rarr; <strong>Secrets and variables</strong> &rarr; <strong>Actions</strong></li>
-                            <li>Add <strong>Repository secret</strong> (not Environment secret):</li>
-                            <li>Name: <code>VITE_API_ID</code>, Value: <i>(your ID numbers)</i></li>
-                            <li>Name: <code>VITE_API_HASH</code>, Value: <i>(your Hash string)</i></li>
-                            <li>Go to <strong>Actions</strong> tab &rarr; Select last workflow &rarr; <strong>Re-run all jobs</strong></li>
-                        </ol>
-                        <p style={{ marginTop: '10px', fontSize: '0.9em' }}>Current value: ID={apiId ? 'Has Value' : 'Empty'}, Hash={apiHash ? 'Has Value' : 'Empty'}</p>
-                    </div>
+                        <h1>Telegram API keys are missing.</h1>
+                        <p>Before the redesigned experience can work, this app needs valid `VITE_API_ID` and `VITE_API_HASH` values.</p>
+                    </section>
+
+                    <section className="auth-panel">
+                        <div className="error-message auth-panel__error">
+                            <p><strong>How to fix it on GitHub Pages</strong></p>
+                            <ol>
+                                <li>Open repository Settings, then Secrets and variables, then Actions.</li>
+                                <li>Add `VITE_API_ID` as a repository secret.</li>
+                                <li>Add `VITE_API_HASH` as a repository secret.</li>
+                                <li>Re-run the latest deployment workflow.</li>
+                            </ol>
+                            <p>Current values: ID={apiId ? 'set' : 'empty'}, Hash={apiHash ? 'set' : 'empty'}</p>
+                        </div>
+                    </section>
                 </div>
             </div>
         );
@@ -61,19 +70,15 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
     const [qrCode, setQrCode] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    // Auth state from the new flow
     const [authState, setAuthState] = useState<AuthState>({ step: 'idle' });
+    const [showStory, setShowStory] = useState(false);
 
-    // Auth callbacks
     const handleStateChange = useCallback((state: AuthState) => {
-        console.log('[Auth] State changed:', state.step);
         setAuthState(state);
         setIsLoading(false);
 
         switch (state.step) {
             case 'done':
-                // Mark as initialized for session check
                 localStorage.setItem('mtcute_initialized', 'true');
                 onAuthenticated();
                 break;
@@ -99,7 +104,6 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
             await startQRAuth({ onStateChange: handleStateChange });
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Authentication failed');
-            console.error('QR Auth error:', err);
             setIsLoading(false);
         }
     };
@@ -119,26 +123,18 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
             await startPhoneAuth(phoneNumber, { onStateChange: handleStateChange });
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Authentication failed');
-            console.error('Phone Auth error:', err);
             setIsLoading(false);
         }
     };
 
     const handleCodeSubmit = async () => {
-        if (code.length < 5 || authState.step !== 'code') {
-            return;
-        }
+        if (code.length < 5 || authState.step !== 'code') return;
 
         setIsLoading(true);
         setError(null);
 
         try {
-            await submitCode(
-                authState.phone,
-                code,
-                authState.phoneCodeHash,
-                { onStateChange: handleStateChange }
-            );
+            await submitCode(authState.phone, code, authState.phoneCodeHash, { onStateChange: handleStateChange });
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Verification failed');
             setIsLoading(false);
@@ -146,9 +142,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
     };
 
     const handlePasswordSubmit = async () => {
-        if (!password) {
-            return;
-        }
+        if (!password) return;
 
         setIsLoading(true);
         setError(null);
@@ -162,7 +156,6 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
     };
 
     const handleModeChange = (newMode: AuthMode) => {
-        // Stop QR polling when switching modes
         stopQRAuth();
         setMode(newMode);
         setAuthState({ step: 'idle' });
@@ -181,53 +174,45 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
         setQrCode(null);
     };
 
-    // Determine what to render based on auth state
     const renderAuthContent = () => {
-        // 2FA screen (same for both modes)
         if (authState.step === '2fa') {
             return (
                 <>
                     <div className="form-group">
-                        <label className="form-label">Two-Factor Authentication</label>
+                        <label className="form-label">Two-factor password</label>
                         <p className="form-hint">
                             {passwordHint
                                 ? <>Hint: <strong>{passwordHint}</strong></>
-                                : 'Your account has 2FA enabled. Please enter your cloud password.'}
+                                : 'This account uses cloud password protection.'}
                         </p>
                         <input
                             type="password"
                             className="form-input"
-                            placeholder="Enter your 2FA password"
+                            placeholder="Enter your password"
                             value={password}
-                            onChange={(e) => setPassword(e.target.value)}
+                            onChange={(event) => setPassword(event.target.value)}
                             disabled={isLoading}
                             autoFocus
-                            onKeyDown={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+                            onKeyDown={(event) => event.key === 'Enter' && handlePasswordSubmit()}
                         />
                     </div>
-                    <button
-                        className="auth-button"
-                        onClick={handlePasswordSubmit}
-                        disabled={isLoading || !password}
-                    >
-                        {isLoading ? 'Verifying...' : 'Submit'}
+                    <button className="auth-button" onClick={handlePasswordSubmit} disabled={isLoading || !password}>
+                        {isLoading ? 'Verifying...' : 'Unlock account'}
                     </button>
                 </>
             );
         }
 
         if (mode === 'qr') {
-            // QR Code mode
             if (qrCode) {
                 return (
-                    <div className="qr-container">
+                    <div className="qr-block">
                         <div className="qr-code">
-                            <QRCodeSVG value={qrCode} size={200} />
+                            <QRCodeSVG value={qrCode} size={210} />
                         </div>
-                        <div className="qr-instructions">
+                        <div className="qr-copy">
                             <strong>Scan with Telegram</strong>
-                            Open Telegram on your phone, go to Settings → Devices → Link
-                            Desktop Device, and scan this QR code
+                            <p>Open Telegram on your phone, then go to Settings, Devices, Link Desktop Device and scan this code.</p>
                         </div>
                     </div>
                 );
@@ -235,117 +220,159 @@ const Auth: React.FC<AuthProps> = ({ onAuthenticated }) => {
 
             return isLoading ? (
                 <div className="loading-container">
-                    <div className="spinner"></div>
-                    <div className="loading-text">Connecting...</div>
+                    <div className="spinner" />
+                    <div className="loading-text">Generating a secure QR session...</div>
                 </div>
             ) : (
                 <button className="auth-button" onClick={handleQRAuth}>
-                    Generate QR Code
+                    Generate QR code
                 </button>
             );
-        } else {
-            // Phone mode
-            if (authState.step === 'code') {
-                return (
-                    <>
-                        <div className="form-group">
-                            <label className="form-label">Verification Code</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="12345"
-                                value={code}
-                                onChange={(e) => setCode(e.target.value)}
-                                disabled={isLoading}
-                                maxLength={6}
-                                autoFocus
-                                onKeyDown={(e) => e.key === 'Enter' && handleCodeSubmit()}
-                            />
-                        </div>
-                        <button
-                            className="auth-button"
-                            onClick={handleCodeSubmit}
-                            disabled={isLoading || code.length < 5}
-                        >
-                            {isLoading ? 'Verifying...' : 'Verify'}
-                        </button>
-                    </>
-                );
-            }
+        }
 
+        if (authState.step === 'code') {
             return (
                 <>
                     <div className="form-group">
-                        <label className="form-label">Phone Number</label>
+                        <label className="form-label">Verification code</label>
                         <input
-                            type="tel"
+                            type="text"
                             className="form-input"
-                            placeholder="+1234567890"
-                            value={phoneNumber}
-                            onChange={(e) => setPhoneNumber(e.target.value)}
+                            placeholder="12345"
+                            value={code}
+                            onChange={(event) => setCode(event.target.value)}
                             disabled={isLoading}
-                            onKeyDown={(e) => e.key === 'Enter' && handlePhoneAuth()}
+                            maxLength={6}
+                            autoFocus
+                            onKeyDown={(event) => event.key === 'Enter' && handleCodeSubmit()}
                         />
                     </div>
-                    <button
-                        className="auth-button"
-                        onClick={handlePhoneAuth}
-                        disabled={isLoading || !phoneNumber}
-                    >
-                        {isLoading ? 'Sending code...' : 'Send Code'}
+                    <button className="auth-button" onClick={handleCodeSubmit} disabled={isLoading || code.length < 5}>
+                        {isLoading ? 'Verifying...' : 'Confirm code'}
                     </button>
                 </>
             );
         }
+
+        return (
+            <>
+                <div className="form-group">
+                    <label className="form-label">Phone number</label>
+                    <input
+                        type="tel"
+                        className="form-input"
+                        placeholder="+1234567890"
+                        value={phoneNumber}
+                        onChange={(event) => setPhoneNumber(event.target.value)}
+                        disabled={isLoading}
+                        onKeyDown={(event) => event.key === 'Enter' && handlePhoneAuth()}
+                    />
+                </div>
+                <button className="auth-button" onClick={handlePhoneAuth} disabled={isLoading || !phoneNumber}>
+                    {isLoading ? 'Sending code...' : 'Send login code'}
+                </button>
+            </>
+        );
     };
 
     return (
-        <div className="auth-container fade-in">
-            <div className="auth-card">
-                <div className="auth-header">
-                    <div className="auth-logo">
-                        <Music size={48} className="auth-logo-icon" />
+        <div className="auth-scene fade-in">
+            <div className="auth-ambient auth-ambient--one" />
+            <div className="auth-ambient auth-ambient--two" />
+
+            <div className="auth-grid">
+                <section className="auth-panel auth-panel--primary">
+                    <div className="auth-panel__brand">
+                        <div className="auth-story__mark">
+                            <Music size={24} />
+                        </div>
+                        <div>
+                            <p className="eyebrow">Connect</p>
+                            <strong>Music TG</strong>
+                        </div>
                     </div>
-                    <h1 className="auth-title">Music TG</h1>
-                    <p className="auth-subtitle">
-                        Connect your Telegram to access your music
-                    </p>
-                </div>
 
-                <div className="auth-tabs">
-                    <button
-                        className={`auth-tab ${mode === 'qr' ? 'active' : ''}`}
-                        onClick={() => handleModeChange('qr')}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                    >
-                        <QrCode size={18} />
-                        QR Code
-                    </button>
-                    <button
-                        className={`auth-tab ${mode === 'phone' ? 'active' : ''}`}
-                        onClick={() => handleModeChange('phone')}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                    >
-                        <Smartphone size={18} />
-                        Phone Number
-                    </button>
-                </div>
+                    <div className="auth-panel__header">
+                        <h2>Connect Telegram</h2>
+                        <p className="auth-panel__subtitle">Вход сразу перед глазами. Выбери удобный способ и продолжай.</p>
+                    </div>
 
-                {error && (
-                    <div className="error-message">
-                        {error}
+                    <div className="auth-tabs">
                         <button
-                            className="error-retry-button"
-                            onClick={handleRetry}
+                            className={`auth-tab ${mode === 'qr' ? 'active' : ''}`}
+                            onClick={() => handleModeChange('qr')}
                         >
-                            Try Again
+                            <QrCode size={16} />
+                            <span>QR Code</span>
+                        </button>
+                        <button
+                            className={`auth-tab ${mode === 'phone' ? 'active' : ''}`}
+                            onClick={() => handleModeChange('phone')}
+                        >
+                            <Smartphone size={16} />
+                            <span>Phone</span>
                         </button>
                     </div>
-                )}
 
-                <div className="auth-form">
-                    {renderAuthContent()}
-                </div>
+                    {error && (
+                        <div className="error-message">
+                            <span>{error}</span>
+                            <button className="error-retry-button" onClick={handleRetry}>
+                                Try Again
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="auth-form">
+                        {renderAuthContent()}
+                    </div>
+
+                    <button
+                        className="auth-story-toggle"
+                        onClick={() => setShowStory((value) => !value)}
+                    >
+                        <Sparkles size={16} />
+                        <span>{showStory ? 'Скрыть описание' : 'Что это?'}</span>
+                    </button>
+                </section>
+
+                {showStory && (
+                    <section className="auth-story auth-story--collapsible">
+                        <div className="auth-story__badge">
+                            <Sparkles size={14} />
+                            <span>About Music TG</span>
+                        </div>
+
+                        <h1>Turn your Telegram archive into a polished listening space.</h1>
+                        <p>
+                            Sign in once, sync your music sources, and explore a redesigned player crafted to feel cinematic, modern, and focused.
+                        </p>
+
+                        <div className="auth-feature-list">
+                            <div className="auth-feature">
+                                <Waves size={18} />
+                                <div>
+                                    <strong>Unified library view</strong>
+                                    <span>Saved Messages, chats, and channels in one flow.</span>
+                                </div>
+                            </div>
+                            <div className="auth-feature">
+                                <ShieldCheck size={18} />
+                                <div>
+                                    <strong>Secure Telegram sign-in</strong>
+                                    <span>QR and phone-based auth, plus 2FA support.</span>
+                                </div>
+                            </div>
+                            <div className="auth-feature">
+                                <LockKeyhole size={18} />
+                                <div>
+                                    <strong>Private session handling</strong>
+                                    <span>Your mtcute session stays managed locally in the browser.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                )}
             </div>
         </div>
     );

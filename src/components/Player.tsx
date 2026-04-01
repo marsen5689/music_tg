@@ -1,18 +1,33 @@
-import React, { useState, useEffect, useRef } from 'react';
-import type { Track, AudioSource } from '../types';
+import React, { useEffect, useRef, useState } from 'react';
+import type { AudioSource, Track } from '../types';
 import {
-    fetchAudioFiles,
+    clearSession,
     downloadAudioFile,
     downloadAudioFileStreaming,
-    clearSession,
-    getTelegramClient,
+    fetchAudioFiles,
     getAudioSources,
+    getTelegramClient,
 } from '../utils/telegram';
 import {
-    Play, Pause, SkipBack, SkipForward, Volume2,
-    Settings, LogOut, Search, Music, Disc,
-    User, Users, Megaphone, Star, X,
-    AlertCircle, Loader2
+    AlertCircle,
+    Disc,
+    Loader2,
+    LogOut,
+    Megaphone,
+    Music,
+    Pause,
+    Play,
+    Search,
+    Settings,
+    SkipBack,
+    SkipForward,
+    Sparkles,
+    Star,
+    User,
+    Users,
+    Volume2,
+    Waves,
+    X,
 } from 'lucide-react';
 import './Player.css';
 
@@ -23,6 +38,7 @@ interface PlayerProps {
 const Player: React.FC<PlayerProps> = ({ onLogout }) => {
     const [tracks, setTracks] = useState<Track[]>([]);
     const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+    const [pendingTrack, setPendingTrack] = useState<Track | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -34,50 +50,56 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
     const [showSettings, setShowSettings] = useState(false);
     const [sourceSearchQuery, setSourceSearchQuery] = useState('');
     const [noTracksFound, setNoTracksFound] = useState(false);
-
-    const filteredSources = audioSources.filter(source =>
-        source.title.toLowerCase().includes(sourceSearchQuery.toLowerCase())
-    );
     const [isBuffering, setIsBuffering] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const progressBarRef = useRef<HTMLDivElement>(null);
     const volumeBarRef = useRef<HTMLDivElement>(null);
-    const trackCacheRef = useRef<Map<string, string>>(new Map()); // Cache for track URLs
-    const cleanupRef = useRef<(() => void) | null>(null); // Cleanup for streaming
+    const volumeDragCleanupRef = useRef<(() => void) | null>(null);
+    const trackCacheRef = useRef<Map<string, string>>(new Map());
+    const cleanupRef = useRef<(() => void) | null>(null);
     const nextTrackTriggerRef = useRef<(() => void) | null>(null);
     const loadingTrackIdRef = useRef<string | null>(null);
+
+    const filteredSources = audioSources.filter((source) =>
+        source.title.toLowerCase().includes(sourceSearchQuery.toLowerCase())
+    );
+
+    const filteredTracks = tracks.filter((track) =>
+        track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        track.artist.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const uniqueArtists = new Set(tracks.map((track) => track.artist)).size;
+    const totalDurationMinutes = Math.round(
+        tracks.reduce((sum, track) => sum + (track.duration || 0), 0) / 60
+    );
+    const activeSource =
+        audioSources.find((source) => source.id === currentSourceId)?.title ||
+        (currentSourceId ? 'Selected source' : 'Saved Messages');
 
     const loadTracks = async () => {
         setIsLoading(true);
         setTracks([]);
         setNoTracksFound(false);
 
-        // 3-second timeout for "Nothing found"
         const timeoutId = setTimeout(() => {
-            setTracks(currentTracks => {
+            setTracks((currentTracks) => {
                 if (currentTracks.length === 0) {
                     setNoTracksFound(true);
-                    // We can't easily cancel the fetch here as it's a promise,
-                    // but the UI will show "Nothing found"
                 }
                 return currentTracks;
             });
         }, 3000);
 
         try {
-            console.log('Starting to load tracks...');
             const client = getTelegramClient();
-            console.log('Got Telegram client');
-
-            // mtcute handles connection automatically in API calls
             await client.connect();
-            console.log('Client ready');
 
-            console.log('Fetching audio files...');
             const audioFiles = await fetchAudioFiles(currentSourceId, (track) => {
-                setTracks(prev => {
-                    const exists = prev.some(t => t.id === track.id);
+                setTracks((prev) => {
+                    const exists = prev.some((item) => item.id === track.id);
                     if (exists) return prev;
                     if (prev.length === 0) {
                         setNoTracksFound(false);
@@ -86,17 +108,11 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
                     return [...prev, track];
                 });
             });
-            console.log('Found', audioFiles.length, 'audio files');
-            // Final sync
+
             setTracks(audioFiles);
         } catch (error) {
             console.error('Failed to load tracks:', error);
-            console.error('Error details:', {
-                message: error instanceof Error ? error.message : 'Unknown error',
-                stack: error instanceof Error ? error.stack : undefined,
-                error
-            });
-            setTracks(current => {
+            setTracks((current) => {
                 if (current.length === 0) {
                     alert(`Failed to load tracks: ${error instanceof Error ? error.message : 'Unknown error'}. Please check the console for details.`);
                 }
@@ -118,45 +134,31 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
         }
     }, [volume]);
 
-
-
-    const [pendingTrack, setPendingTrack] = useState<Track | null>(null);
-
     const playTrack = async (track: Track) => {
         if (currentTrack?.id === track.id && audioRef.current) {
-            // Toggle play/pause for current track
             if (isPlaying) {
                 audioRef.current.pause();
                 setIsPlaying(false);
             } else {
-                audioRef.current.play();
+                await audioRef.current.play();
                 setIsPlaying(true);
             }
             return;
         }
 
-        // New track selected
         setPendingTrack(track);
+        setIsBuffering(true);
         loadingTrackIdRef.current = track.id;
-
-        // Do NOT set currentTrack or isBuffering yet. 
-        // We want the old track to keep playing.
-
         setLoadingProgress(0);
 
         try {
             let url: string;
             let cleanup: (() => void) | undefined;
 
-            // Check if track is already cached
             if (trackCacheRef.current.has(track.id)) {
-                console.log('Using cached track:', track.title);
                 url = trackCacheRef.current.get(track.id)!;
             } else {
-                console.log('Streaming track:', track.title);
-
                 try {
-                    // Try streaming download first
                     const result = await downloadAudioFileStreaming(
                         track.messageId,
                         track.mimeType,
@@ -169,11 +171,9 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
                     );
                     url = result.url;
                     cleanup = result.cleanup;
-                    console.log('Using streaming playback');
                 } catch (streamError) {
                     if (loadingTrackIdRef.current !== track.id) return;
                     console.warn('Streaming failed, falling back to regular download:', streamError);
-                    // Fallback to regular regular download
                     const blob = await downloadAudioFile(track.messageId, track.chatId, (progress) => {
                         if (loadingTrackIdRef.current === track.id) {
                             setLoadingProgress(progress);
@@ -183,18 +183,15 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
                 }
 
                 if (loadingTrackIdRef.current !== track.id) {
-                    // Request cancelled
                     if (cleanup) cleanup();
                     return;
                 }
 
-                // Cache the URL only if it's a full download (no cleanup function)
                 if (!cleanup) {
                     trackCacheRef.current.set(track.id, url);
                 }
             }
 
-            // Clean up previous pending download if any
             if (cleanupRef.current) {
                 cleanupRef.current();
                 cleanupRef.current = null;
@@ -203,16 +200,24 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
                 cleanupRef.current = cleanup;
             }
 
-            // Create new Audio instance for the next track
             const nextAudio = new Audio(url);
             nextAudio.volume = volume;
+            nextAudio.preload = 'auto';
 
-            // Wait for it to be ready to play
+            setCurrentTrack(track);
+            setPendingTrack(track);
+            setIsPlaying(false);
+            setCurrentTime(0);
+            setDuration(track.duration || 0);
+
+            nextAudio.onloadedmetadata = () => {
+                if (loadingTrackIdRef.current !== track.id) return;
+                setDuration(nextAudio.duration || track.duration || 0);
+            };
+
             nextAudio.oncanplay = async () => {
-                // Ensure this is still the requested track
                 if (loadingTrackIdRef.current !== track.id) return;
 
-                // Stop the old track
                 if (audioRef.current) {
                     audioRef.current.pause();
                     audioRef.current.src = '';
@@ -220,10 +225,8 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
                     audioRef.current.onended = null;
                 }
 
-                // Swap references
                 audioRef.current = nextAudio;
 
-                // Setup listeners on the new active audio
                 nextAudio.ontimeupdate = () => {
                     setCurrentTime(nextAudio.currentTime);
                 };
@@ -232,61 +235,61 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
                     nextTrackTriggerRef.current?.();
                 };
 
-                // Update UI state
-                setCurrentTrack(track);
                 setPendingTrack(null);
                 setIsBuffering(false);
-                setDuration(nextAudio.duration || 0);
-                setIsPlaying(true);
+                setDuration(nextAudio.duration || track.duration || 0);
 
                 try {
                     await nextAudio.play();
-                } catch (e) {
-                    console.error("Playback failed", e);
+                    setIsPlaying(true);
+                } catch (error) {
+                    console.error('Playback failed', error);
+                    setIsPlaying(false);
                 }
             };
 
-            nextAudio.onerror = (e) => {
-                if (loadingTrackIdRef.current !== track.id) {
-                    console.log('Ignored error for cancelled track load:', track.title);
-                    return;
-                }
-                console.error("Error loading new track", e);
+            nextAudio.onplay = () => {
+                if (loadingTrackIdRef.current !== track.id) return;
                 setPendingTrack(null);
-                alert("Failed to load track");
+                setIsBuffering(false);
+                setIsPlaying(true);
             };
 
-            // Trigger load
-            nextAudio.load();
+            nextAudio.onwaiting = () => {
+                if (loadingTrackIdRef.current !== track.id) return;
+                setIsBuffering(true);
+            };
 
+            nextAudio.onplaying = () => {
+                if (loadingTrackIdRef.current !== track.id) return;
+                setIsBuffering(false);
+                setIsPlaying(true);
+            };
+
+            nextAudio.onerror = (event) => {
+                if (loadingTrackIdRef.current !== track.id) return;
+                console.error('Error loading new track', event);
+                setPendingTrack(null);
+                setIsBuffering(false);
+                alert('Failed to load track');
+            };
+
+            nextAudio.load();
+            void nextAudio.play().catch((error) => {
+                console.warn('Immediate playback is waiting for buffer or user gesture:', error);
+            });
         } catch (error) {
             if (loadingTrackIdRef.current !== track.id) return;
             console.error('Failed to play track:', error);
             setPendingTrack(null);
+            setIsBuffering(false);
             alert(`Failed to play track: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     };
 
-
-
     const playNext = () => {
-        // We look up based on the *latest* currentTrack state or the passed ID? 
-        // playNext uses 'currentTrack' from state.
-        // But if we are in the middle of a transition, currentTrack is the OLD one. 
-        // playNext should find the one AFTER the OLD one? 
-        // Yes, that's correct behavior for "skip".
-        // But for "onEnded", currentTrack is the one that just finished. Correct.
-
-        // We need to access the LATEST currentTrack.
-        // Since playNext is recreated on render (it uses closure state), it should be fine IF 
-        // we keep the onended listener up to date.
-        // But we attach onended ONCE when swapping.
-        // So we need `nextTrackTriggerRef` to always point to the fresh playNext.
-        // And the listener calls `nextTrackTriggerRef.current()`.
-
-        // Logic for playNext:
         if (!currentTrack) return;
-        const currentIndex = tracks.findIndex(t => t.id === currentTrack.id);
+        const currentIndex = tracks.findIndex((track) => track.id === currentTrack.id);
         if (currentIndex < tracks.length - 1) {
             playTrack(tracks[currentIndex + 1]);
         }
@@ -294,37 +297,34 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
 
     const playPrevious = () => {
         if (!currentTrack) return;
-        const currentIndex = tracks.findIndex(t => t.id === currentTrack.id);
+        const currentIndex = tracks.findIndex((track) => track.id === currentTrack.id);
         if (currentIndex > 0) {
             playTrack(tracks[currentIndex - 1]);
         }
     };
 
-    const togglePlayPause = () => {
+    const togglePlayPause = async () => {
         if (!audioRef.current || !currentTrack) return;
 
         if (isPlaying) {
             audioRef.current.pause();
             setIsPlaying(false);
         } else {
-            audioRef.current.play();
+            await audioRef.current.play();
             setIsPlaying(true);
         }
     };
 
-    // Keep the nextTrackTriggerRef updated with the latest playNext closure
     useEffect(() => {
         nextTrackTriggerRef.current = playNext;
-    }, [playNext]);
+    }, [currentTrack, tracks]);
 
-    // Initial audio setup (empty, but ensuring ref is controlled if needed)
     useEffect(() => {
         if (!audioRef.current) {
             audioRef.current = new Audio();
         }
 
         return () => {
-            // Cleanup on unmount
             if (audioRef.current) {
                 audioRef.current.pause();
                 audioRef.current = null;
@@ -332,14 +332,17 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
             if (cleanupRef.current) {
                 cleanupRef.current();
             }
+            if (volumeDragCleanupRef.current) {
+                volumeDragCleanupRef.current();
+            }
         };
     }, []);
 
-    const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const handleProgressClick = (event: React.MouseEvent<HTMLDivElement>) => {
         if (!audioRef.current || !progressBarRef.current) return;
 
         const rect = progressBarRef.current.getBoundingClientRect();
-        const x = e.clientX - rect.left;
+        const x = event.clientX - rect.left;
         const percentage = x / rect.width;
         const newTime = percentage * duration;
 
@@ -347,18 +350,49 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
         setCurrentTime(newTime);
     };
 
-    const handleVolumeClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const handleVolumeClick = (event: React.MouseEvent<HTMLDivElement>) => {
         if (!volumeBarRef.current) return;
 
         const rect = volumeBarRef.current.getBoundingClientRect();
-        const x = e.clientX - rect.left;
+        const x = event.clientX - rect.left;
         const percentage = Math.max(0, Math.min(1, x / rect.width));
 
         setVolume(percentage);
     };
 
+    const updateVolumeFromPointer = (clientX: number) => {
+        if (!volumeBarRef.current) return;
+
+        const rect = volumeBarRef.current.getBoundingClientRect();
+        const percentage = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+        setVolume(percentage);
+    };
+
+    const handleVolumePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        updateVolumeFromPointer(event.clientX);
+
+        const handlePointerMove = (moveEvent: PointerEvent) => {
+            updateVolumeFromPointer(moveEvent.clientX);
+        };
+
+        const cleanup = () => {
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', cleanup);
+            window.removeEventListener('pointercancel', cleanup);
+            volumeDragCleanupRef.current = null;
+        };
+
+        volumeDragCleanupRef.current?.();
+        volumeDragCleanupRef.current = cleanup;
+
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', cleanup);
+        window.addEventListener('pointercancel', cleanup);
+    };
+
     const formatTime = (seconds: number): string => {
-        if (isNaN(seconds)) return '0:00';
+        if (Number.isNaN(seconds)) return '0:00';
 
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
@@ -370,13 +404,11 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
             audioRef.current.pause();
         }
 
-        // Cleanup active stream
         if (cleanupRef.current) {
             cleanupRef.current();
             cleanupRef.current = null;
         }
 
-        // Clean up cached URLs
         trackCacheRef.current.forEach((url) => {
             URL.revokeObjectURL(url);
         });
@@ -399,187 +431,260 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
 
     const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-    const [searchQuery, setSearchQuery] = useState('');
-
-    const filteredTracks = tracks.filter(track =>
-        track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        track.artist.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
     return (
-        <div className="player-container fade-in">
-            {/* audio element is managed via new Audio() */}
+        <div className="player-page fade-in">
+            <div className="player-page__glow player-page__glow--one" />
+            <div className="player-page__glow player-page__glow--two" />
 
-            <div className="player-header">
-                <div className="player-logo">
-                    <Music className="player-logo-icon" size={32} />
-                    <span>Music Tg</span>
-                </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                    <button className="logout-button" onClick={handleOpenSettings} title="Settings">
-                        <Settings size={20} />
-                    </button>
-                    <button className="logout-button" onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <LogOut size={16} />
-                        Logout
-                    </button>
-                </div>
-            </div>
-
-            <div className="player-main">
-                <div className="track-list-container">
-                    <div className="track-list-header">
-                        <div className="search-container">
-                            <Search className="search-icon" size={16} />
-                            <input
-                                type="text"
-                                className="search-input"
-                                placeholder="Search tracks..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                        </div>
-                        <p className="track-count">
-                            {filteredTracks.length} tracks
-                        </p>
+            <header className="player-topbar">
+                <div className="brand-lockup">
+                    <div className="brand-mark">
+                        <Music size={24} />
                     </div>
+                    <div>
+                        <p className="eyebrow">Telegram Music Archive</p>
+                        <h1>Music TG</h1>
+                    </div>
+                </div>
 
-                    {filteredTracks.length === 0 ? (
-                        <div className="empty-state">
-                            <div className="empty-icon"><Disc size={48} opacity={0.5} /></div>
-                            <div className="empty-text">
-                                {searchQuery ? 'No tracks found' : 'No music found in Saved Messages'}
+                <div className="topbar-actions">
+                    <button className="topbar-button" onClick={handleOpenSettings} title="Settings">
+                        <Settings size={18} />
+                        <span>Sources</span>
+                    </button>
+                    <button className="topbar-button topbar-button--danger" onClick={handleLogout}>
+                        <LogOut size={16} />
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </header>
+
+            <main className="player-layout">
+                <aside className="player-sidebar">
+                    <section className="hero-panel">
+                        <div className="hero-panel__badge">
+                            <Sparkles size={14} />
+                            <span>Curated listening cockpit</span>
+                        </div>
+                        <h2>Your Telegram music, reframed like a premium collection.</h2>
+                        <p>
+                            Browse saved audio, switch between sources, and keep playback controls close without losing the library overview.
+                        </p>
+
+                        <div className="hero-stats">
+                            <div className="hero-stat">
+                                <span className="hero-stat__label">Tracks</span>
+                                <strong>{tracks.length}</strong>
+                            </div>
+                            <div className="hero-stat">
+                                <span className="hero-stat__label">Artists</span>
+                                <strong>{uniqueArtists}</strong>
+                            </div>
+                            <div className="hero-stat">
+                                <span className="hero-stat__label">Minutes</span>
+                                <strong>{totalDurationMinutes}</strong>
                             </div>
                         </div>
-                    ) : (
-                        <div className="track-list">
-                            {filteredTracks.map((track, index) => (
-                                <button
-                                    key={track.id}
-                                    className={`track-item ${currentTrack?.id === track.id ? 'active playing' : ''
-                                        }`}
-                                    onClick={() => playTrack(track)}
-                                >
-                                    <div className="track-number">
-                                        {pendingTrack?.id === track.id ? (
-                                            <Loader2 className="animate-spin" size={14} />
-                                        ) : currentTrack?.id === track.id && isPlaying ? (
-                                            <span className="track-play-icon"><Play size={14} fill="currentColor" /></span>
-                                        ) : (
-                                            index + 1
-                                        )}
-                                    </div>
-                                    <div className="track-info">
-                                        <div className="track-title">{track.title}</div>
-                                        <div className="track-artist">{track.artist}</div>
-                                    </div>
-                                    <div className="track-duration">
-                                        {formatTime(track.duration)}
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
+                    </section>
 
-            {currentTrack && (
-                <div className="player-controls-container">
-                    <div className="now-playing">
-                        <div className="now-playing-artwork">
-                            <Music size={32} />
+                    <section className="sidebar-card sidebar-source-card">
+                        <div className="sidebar-card__header">
+                            <span className="sidebar-card__kicker">Active source</span>
+                            <Waves size={16} />
                         </div>
-                        <div className="now-playing-info">
-                            <div className="now-playing-title">{currentTrack.title}</div>
-                            <div className="now-playing-artist">{currentTrack.artist}</div>
+                        <strong>{activeSource}</strong>
+                        <p>{currentSourceId ? 'Library scoped to the selected dialog or channel.' : 'Listening from your Saved Messages archive.'}</p>
+                    </section>
+
+                    <section className="sidebar-card spotlight-card">
+                        <div className="sidebar-card__header">
+                            <span className="sidebar-card__kicker">Now in focus</span>
+                            <Disc size={16} />
+                        </div>
+
+                        {currentTrack ? (
+                            <>
+                                <div className="spotlight-card__art">
+                                    <Music size={28} />
+                                </div>
+                                <strong>{currentTrack.title}</strong>
+                                <p>{currentTrack.artist}</p>
+                                <div className="spotlight-card__meta">
+                                    <span>{formatTime(duration || currentTrack.duration)}</span>
+                                    <span>{isPlaying ? 'Playing' : 'Paused'}</span>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="spotlight-card__art spotlight-card__art--idle">
+                                    <Play size={22} />
+                                </div>
+                                <strong>Pick a track to begin</strong>
+                                <p>The dock and progress bar will come alive as soon as playback starts.</p>
+                            </>
+                        )}
+                    </section>
+                </aside>
+
+                <section className="library-shell">
+                    <div className="library-shell__header">
+                        <div>
+                            <p className="eyebrow">Library</p>
+                            <h2>Sound selection</h2>
+                        </div>
+                        <div className="library-shell__meta">
+                            <div className="search-shell">
+                                <Search className="search-icon" size={16} />
+                                <input
+                                    type="text"
+                                    className="search-input"
+                                    placeholder="Search tracks or artists"
+                                    value={searchQuery}
+                                    onChange={(event) => setSearchQuery(event.target.value)}
+                                />
+                            </div>
+                            <div className="library-badge">{filteredTracks.length} visible</div>
                         </div>
                     </div>
 
-                    {isBuffering && (
-                        <div className="buffer-loading-container">
-                            <div className="buffer-loading-bar" style={{ width: `${Math.max(10, loadingProgress)}%` }} />
-                        </div>
-                    )}
+                    <div className="library-list">
+                        {filteredTracks.length === 0 ? (
+                            <div className="empty-state">
+                                <div className="empty-state__icon">
+                                    {searchQuery ? <Search size={42} /> : <Disc size={42} />}
+                                </div>
+                                <strong>{searchQuery ? 'Nothing matches this search' : 'No music found yet'}</strong>
+                                <p>{searchQuery ? 'Try a different title, artist, or clear the search field.' : 'This source does not contain any supported audio messages yet.'}</p>
+                            </div>
+                        ) : (
+                            filteredTracks.map((track, index) => {
+                                const isCurrent = currentTrack?.id === track.id;
+                                const isPending = pendingTrack?.id === track.id;
 
-                    <div className="player-controls">
-                        <div className="progress-container">
-                            <span className="time-display">{formatTime(currentTime)}</span>
+                                return (
+                                    <button
+                                        key={track.id}
+                                        className={`track-card ${isCurrent ? 'is-active' : ''}`}
+                                        onClick={() => playTrack(track)}
+                                    >
+                                        <div className="track-card__index">
+                                            {isPending ? (
+                                                <Loader2 className="animate-spin" size={15} />
+                                            ) : isCurrent && isPlaying ? (
+                                                <Pause size={15} />
+                                            ) : (
+                                                <span>{String(index + 1).padStart(2, '0')}</span>
+                                            )}
+                                        </div>
+
+                                        <div className="track-card__art">
+                                            <Music size={18} />
+                                        </div>
+
+                                        <div className="track-card__content">
+                                            <strong>{track.title}</strong>
+                                            <span>{track.artist}</span>
+                                        </div>
+
+                                        <div className="track-card__tail">
+                                            {isCurrent && <span className="track-chip">Live</span>}
+                                            <span className="track-card__time">{formatTime(track.duration)}</span>
+                                        </div>
+                                    </button>
+                                );
+                            })
+                        )}
+                    </div>
+                </section>
+            </main>
+
+            {currentTrack && (
+                <section className="dock">
+                    <div className="dock__track">
+                        <div className="dock__art">
+                            <Music size={24} />
+                        </div>
+                        <div className="dock__copy">
+                            <strong>{currentTrack.title}</strong>
+                            <span>{currentTrack.artist}</span>
+                        </div>
+                    </div>
+
+                    <div className="dock__controls">
+                        <div className="progress-row">
+                            <span>{formatTime(currentTime)}</span>
                             <div
                                 ref={progressBarRef}
                                 className="progress-bar"
                                 onClick={handleProgressClick}
                             >
                                 <div
-                                    className="progress-fill"
+                                    className="progress-bar__fill"
                                     style={{ width: `${progressPercentage}%` }}
                                 />
                             </div>
-                            <span className="time-display">{formatTime(duration)}</span>
+                            <span>{formatTime(duration)}</span>
                         </div>
 
-                        <div className="controls-buttons">
-                            <button
-                                className="control-button"
-                                onClick={playPrevious}
-                                disabled={!currentTrack}
-                            >
-                                <SkipBack size={20} fill="currentColor" />
+                        <div className="transport">
+                            <button className="transport__button" onClick={playPrevious} disabled={!currentTrack}>
+                                <SkipBack size={18} fill="currentColor" />
                             </button>
-                            <button
-                                className="control-button play-button"
-                                onClick={togglePlayPause}
-                                disabled={!currentTrack}
-                            >
-                                {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" style={{ marginLeft: '4px' }} />}
+                            <button className="transport__button transport__button--primary" onClick={togglePlayPause} disabled={!currentTrack}>
+                                {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
                             </button>
-                            <button
-                                className="control-button"
-                                onClick={playNext}
-                                disabled={!currentTrack}
-                            >
-                                <SkipForward size={20} fill="currentColor" />
+                            <button className="transport__button" onClick={playNext} disabled={!currentTrack}>
+                                <SkipForward size={18} fill="currentColor" />
                             </button>
-
-                            <div className="volume-container">
-                                <Volume2 size={20} className="volume-icon" />
-                                <div
-                                    ref={volumeBarRef}
-                                    className="volume-slider"
-                                    onClick={handleVolumeClick}
-                                >
-                                    <div
-                                        className="volume-fill"
-                                        style={{ width: `${volume * 100}%` }}
-                                    />
-                                </div>
-                            </div>
                         </div>
                     </div>
-                </div>
+
+                    <div className="dock__volume">
+                        <Volume2 size={18} />
+                        <div
+                            ref={volumeBarRef}
+                            className="volume-bar"
+                            onClick={handleVolumeClick}
+                            onPointerDown={handleVolumePointerDown}
+                        >
+                            <div
+                                className="volume-bar__fill"
+                                style={{ width: `${volume * 100}%` }}
+                            />
+                        </div>
+                    </div>
+
+                    {isBuffering && (
+                        <div className="buffer-line">
+                            <div className="buffer-line__fill" style={{ width: `${Math.max(10, loadingProgress)}%` }} />
+                        </div>
+                    )}
+                </section>
             )}
 
             {isLoading && tracks.length === 0 && !noTracksFound && (
                 <div className="loading-overlay">
-                    <div className="loading-content">
-                        <Loader2 className="spinner-icon" size={48} />
-                        <div className="loading-text">
-                            Searching for music...
-                        </div>
+                    <div className="loading-panel">
+                        <Loader2 className="spinner-icon" size={42} />
+                        <strong>Scanning your Telegram audio</strong>
+                        <p>Collecting tracks and shaping the library view.</p>
                     </div>
                 </div>
             )}
 
             {noTracksFound && tracks.length === 0 && (
                 <div className="loading-overlay">
-                    <div className="loading-content">
-                        <div className="empty-icon"><AlertCircle size={48} /></div>
-                        <div className="loading-text">
-                            Nothing found
-                        </div>
-                        <button className="logout-button" style={{ marginTop: '20px' }} onClick={() => {
-                            setNoTracksFound(false);
-                            loadTracks();
-                        }}>
+                    <div className="loading-panel">
+                        <AlertCircle size={42} />
+                        <strong>Nothing found</strong>
+                        <p>Try reloading this source or choose another dialog.</p>
+                        <button
+                            className="topbar-button"
+                            onClick={() => {
+                                setNoTracksFound(false);
+                                loadTracks();
+                            }}
+                        >
                             Try Again
                         </button>
                     </div>
@@ -588,38 +693,51 @@ const Player: React.FC<PlayerProps> = ({ onLogout }) => {
 
             {showSettings && (
                 <div className="settings-overlay fade-in" onClick={() => setShowSettings(false)}>
-                    <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="settings-header">
-                            <h3>Select Source</h3>
-                            <button className="close-button" onClick={() => setShowSettings(false)}><X size={24} /></button>
+                    <div className="settings-modal" onClick={(event) => event.stopPropagation()}>
+                        <div className="settings-modal__header">
+                            <div>
+                                <p className="eyebrow">Sources</p>
+                                <h3>Choose a chat or channel</h3>
+                            </div>
+                            <button className="icon-button" onClick={() => setShowSettings(false)}>
+                                <X size={20} />
+                            </button>
                         </div>
-                        <div className="settings-search" style={{ padding: '16px 24px 0' }}>
-                            <div className="search-container">
-                                <Search className="search-icon" size={18} />
+
+                        <div className="settings-modal__search">
+                            <div className="search-shell">
+                                <Search className="search-icon" size={16} />
                                 <input
                                     type="text"
                                     className="search-input"
-                                    placeholder="Search chats..."
+                                    placeholder="Search chats"
                                     value={sourceSearchQuery}
-                                    onChange={(e) => setSourceSearchQuery(e.target.value)}
+                                    onChange={(event) => setSourceSearchQuery(event.target.value)}
                                     autoFocus
                                 />
                             </div>
                         </div>
-                        <div className="settings-sources-list">
+
+                        <div className="settings-modal__list">
                             {filteredSources.map((source) => (
                                 <button
                                     key={source.id}
-                                    className={`source-item ${currentSourceId === source.id || (!currentSourceId && source.title === 'Saved Messages') ? 'active' : ''}`}
+                                    className={`source-card ${currentSourceId === source.id || (!currentSourceId && source.title === 'Saved Messages') ? 'is-active' : ''}`}
                                     onClick={() => handleSourceSelect(source.id)}
                                 >
-                                    <span className="source-icon">
-                                        {source.title === 'Saved Messages' ? <Star size={18} /> :
-                                            source.type === 'channel' ? <Megaphone size={18} /> :
-                                                source.type === 'user' ? <User size={18} /> : <Users size={18} />}
+                                    <span className="source-card__icon">
+                                        {source.title === 'Saved Messages' ? (
+                                            <Star size={16} />
+                                        ) : source.type === 'channel' ? (
+                                            <Megaphone size={16} />
+                                        ) : source.type === 'user' ? (
+                                            <User size={16} />
+                                        ) : (
+                                            <Users size={16} />
+                                        )}
                                     </span>
-                                    <span className="source-name">{source.title}</span>
-                                    {source.type === 'channel' && <span className="source-badge">Channel</span>}
+                                    <span className="source-card__name">{source.title}</span>
+                                    <span className="source-card__type">{source.type}</span>
                                 </button>
                             ))}
                         </div>
